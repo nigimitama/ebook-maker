@@ -1,32 +1,32 @@
-# React + TypeScript + Vite
+# ebook-maker
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+スキャンした文書画像を輝度・コントラスト調整して、1つのPDFまたはEPUBに変換するWebアプリです。
 
-Currently, two official plugins are available:
+画像は一切サーバーに送信されません。デコード・補正・見開き結合・PDF/EPUB生成のすべてがブラウザ内で完結し、
+ページ画像と調整パラメータはIndexedDBに保存されるためリロードしても作業内容が残ります。
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## 機能
 
-## React Compiler
+- 複数画像ファイル/フォルダの取込(ドラッグ&ドロップ対応)
+- 自動輝度・コントラスト補正 + スライダによる手動調整(プレビュー付き)
+- 見開き結合(2ページを1枚に結合)、並べ替え、削除
+- タイトル・著者のメタデータ入力
+- PDF / EPUB(固定レイアウト・画像埋め込み型)の書き出し
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## 技術スタック
 
-## Expanding the Oxlint configuration
+React + TypeScript + Vite / Canvas 2D API / pdf-lib / JSZip / IndexedDB。
+書き出し処理はWeb Worker上で実行され、UIをブロックしません。
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+## コマンド
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+```sh
+npm install        # 依存関係のインストール
+npm run dev        # 開発サーバー起動
+npm test           # 単体・コンポーネントテスト (Vitest)
+npm run build      # 型チェック (tsc -b) + 本番ビルド
+npm run test:e2e   # E2Eテスト (Playwright)
+npm run lint       # oxlint
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+`npm test` は esbuild 経由で型チェックを行わないため、変更後は `npm run build` も必ず実行してください。

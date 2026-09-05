@@ -7,7 +7,7 @@ interface MetadataFormProps {
 
 export function MetadataForm({ metadata, onChange }: MetadataFormProps) {
   return (
-    <div>
+    <div className="panel metadata-form__fields">
       <label>
         タイトル
         <input

@@ -52,13 +52,13 @@ export function PageList({
   }
 
   return (
-    <div>
+    <div className="panel">
       <button type="button" onClick={() => (mergeMode ? cancelMerge() : setMergeMode(true))}>
         見開き結合
       </button>
 
       {mergeMode && selected.length === 2 && (
-        <div data-testid="merge-preview" style={{ display: 'flex' }}>
+        <div data-testid="merge-preview" className="merge-preview">
           <img src={thumbnails[selected[0]]} alt="left page" />
           <img src={thumbnails[selected[1]]} alt="right page" />
           <button
@@ -77,13 +77,17 @@ export function PageList({
         </div>
       )}
 
-      <ul>
+      <ul className="page-list__items">
         {pages.map((page) => (
           <li
             key={page.id}
             data-testid={`page-item-${page.id}`}
             draggable={!mergeMode}
-            style={page.id === selectedPageId ? { outline: '2px solid blue' } : undefined}
+            className={
+              page.id === selectedPageId
+                ? 'page-list__item page-list__item--selected'
+                : 'page-list__item'
+            }
             onDragStart={() => {
               draggedId.current = page.id
             }}
@@ -102,6 +106,7 @@ export function PageList({
             <img
               src={thumbnails[page.id]}
               alt={`page ${page.order + 1}`}
+              className="page-list__thumb"
               onClick={() => onSelect(page.id)}
             />
             <button type="button" data-testid={`delete-${page.id}`} onClick={() => onDelete(page.id)}>
