@@ -29,9 +29,12 @@ export function PageList({
     draggedId.current = null
     if (!sourceId || sourceId === targetId) return
     const ids = pages.map((p) => p.id)
+    const sourceIndex = ids.indexOf(sourceId)
+    const targetIndex = ids.indexOf(targetId)
     const withoutSource = ids.filter((id) => id !== sourceId)
-    const targetIndex = withoutSource.indexOf(targetId)
-    withoutSource.splice(targetIndex + 1, 0, sourceId)
+    const targetIndexInFiltered = withoutSource.indexOf(targetId)
+    const insertAt = sourceIndex < targetIndex ? targetIndexInFiltered + 1 : targetIndexInFiltered
+    withoutSource.splice(insertAt, 0, sourceId)
     onReorder(withoutSource)
   }
 

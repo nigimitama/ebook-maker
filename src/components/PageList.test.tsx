@@ -54,6 +54,17 @@ describe('PageList', () => {
     expect(props.onReorder).toHaveBeenCalledWith(['b', 'c', 'a'])
   })
 
+  it('reorders to the front when dragging a later page onto the first page', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    const dragged = screen.getByTestId('page-item-c')
+    const target = screen.getByTestId('page-item-a')
+    fireEvent.dragStart(dragged)
+    fireEvent.dragOver(target)
+    fireEvent.drop(target)
+    expect(props.onReorder).toHaveBeenCalledWith(['c', 'a', 'b'])
+  })
+
   it('enters merge mode, previews the two selected pages, and confirms the merge', () => {
     const props = baseProps()
     render(<PageList {...props} />)
