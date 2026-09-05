@@ -1,4 +1,6 @@
-/// <reference lib="webworker" />
+// Type-checked by tsconfig.worker.json, which supplies the WebWorker lib in
+// place of DOM (a `/// <reference lib="webworker" />` here would leak those
+// globals into the app project, which shares this file's imports).
 import { runExport } from './exportCore'
 import type { ExportRequest } from './exportCore'
 import type { RawImage } from '../types'

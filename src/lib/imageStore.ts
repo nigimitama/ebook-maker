@@ -143,7 +143,8 @@ export class ImageStore {
     const blobStore = tx.objectStore(BLOB_STORE)
     const pageStore = tx.objectStore(PAGE_STORE)
     for (const id of removeIds) {
-      const p = pages.find((page) => page.id === id)!
+      const p = pages.find((page) => page.id === id)
+      if (!p) throw new Error(`page not found: ${id}`)
       pageStore.delete(id)
       blobStore.delete(p.blobId)
     }
