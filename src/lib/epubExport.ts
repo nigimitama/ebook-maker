@@ -56,14 +56,23 @@ function navXhtml(): string {
 `
 }
 
+// JSZip.folder() returns null only for a name it refuses (a regex-like
+// argument); every call here passes a plain literal, so a null is a bug in
+// this file rather than a condition to recover from.
+function folder(zip: JSZip, name: string): JSZip {
+  const created = zip.folder(name)
+  if (!created) throw new Error(`failed to create zip folder: ${name}`)
+  return created
+}
+
 export async function buildEpub(pages: ExportPage[], metadata: BookMetadata): Promise<Uint8Array> {
   const zip = new JSZip()
   zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' })
-  zip.folder('META-INF')!.file('container.xml', CONTAINER_XML)
+  folder(zip, 'META-INF').file('container.xml', CONTAINER_XML)
 
-  const oebps = zip.folder('OEBPS')!
-  const images = oebps.folder('images')!
-  const text = oebps.folder('text')!
+  const oebps = folder(zip, 'OEBPS')
+  const images = folder(oebps, 'images')
+  const text = folder(oebps, 'text')
 
   const manifestItems: string[] = []
   const spineItems: string[] = []
