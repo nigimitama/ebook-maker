@@ -743,6 +743,7 @@ git commit -m "feat: add mergeSpread side-by-side image combiner"
 ### Task 6: `buildPdf` — PDF assembly with `pdf-lib`
 
 **Files:**
+- Create: `src/test/pngFixture.ts`
 - Create: `src/lib/pdfExport.ts`
 - Test: `src/lib/pdfExport.test.ts`
 
@@ -752,35 +753,45 @@ git commit -m "feat: add mergeSpread side-by-side image combiner"
   - `interface ExportPage { png: Uint8Array; width: number; height: number }`
   - `async function buildPdf(pages: ExportPage[], metadata: BookMetadata): Promise<Uint8Array>`
   - Both are consumed by `ExportWorker` (Task 8), which supplies already-PNG-encoded pages (encoding happens in the worker via `OffscreenCanvas.convertToBlob`, not here — keeping this function canvas-free and unit-testable in Node/jsdom).
+  - `src/test/pngFixture.ts` exports `TINY_PNG_BASE64` (a hand-built, verified valid 2x1 PNG) and `decodeBase64Png(): Uint8Array` — reused by Task 7's and Task 8's tests so the fixture and its decoder are defined once, not copy-pasted per test file.
 
 - [ ] **Step 1: Install `pdf-lib`**
 
 Run: `npm install pdf-lib`
 Expected: exit code 0, added to `dependencies`.
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 2: Write the shared PNG test fixture**
+
+```ts
+// src/test/pngFixture.ts
+
+// A hand-built valid 2x1 PNG (red pixel, green pixel), generated and
+// verified against pdf-lib's embedPng at plan-authoring time. Shared by
+// pdfExport.test.ts, epubExport.test.ts, and exportCore.test.ts so the
+// fixture bytes and decoder are defined in exactly one place.
+export const TINY_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII='
+
+export function decodeBase64Png(): Uint8Array {
+  const binary = atob(TINY_PNG_BASE64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+  return bytes
+}
+```
+
+- [ ] **Step 3: Write the failing test**
 
 ```ts
 // src/lib/pdfExport.test.ts
 import { describe, it, expect } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { buildPdf } from './pdfExport'
-
-// A hand-built valid 2x1 PNG (red pixel, green pixel), generated and
-// verified against pdf-lib's embedPng at plan-authoring time.
-const TINY_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII='
-
-function decodeBase64(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
+import { decodeBase64Png } from '../test/pngFixture'
 
 describe('buildPdf', () => {
   it('builds a PDF with one page per input image and embeds metadata', async () => {
-    const png = decodeBase64(TINY_PNG_BASE64)
+    const png = decodeBase64Png()
     const pages = [
       { png, width: 2, height: 1 },
       { png, width: 2, height: 1 },
@@ -799,12 +810,12 @@ describe('buildPdf', () => {
 })
 ```
 
-- [ ] **Step 3: Run test to verify it fails**
+- [ ] **Step 4: Run test to verify it fails**
 
 Run: `npm test -- pdfExport`
 Expected: FAIL — `Cannot find module './pdfExport'`.
 
-- [ ] **Step 4: Implement `src/lib/pdfExport.ts`**
+- [ ] **Step 5: Implement `src/lib/pdfExport.ts`**
 
 ```ts
 import { PDFDocument } from 'pdf-lib'
@@ -831,15 +842,15 @@ export async function buildPdf(pages: ExportPage[], metadata: BookMetadata): Pro
 }
 ```
 
-- [ ] **Step 5: Run test to verify it passes**
+- [ ] **Step 6: Run test to verify it passes**
 
 Run: `npm test -- pdfExport`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 7: Commit**
 
 ```bash
-git add package.json package-lock.json src/lib/pdfExport.ts src/lib/pdfExport.test.ts
+git add package.json package-lock.json src/test/pngFixture.ts src/lib/pdfExport.ts src/lib/pdfExport.test.ts
 git commit -m "feat: add buildPdf PDF assembly via pdf-lib"
 ```
 
@@ -867,20 +878,11 @@ Expected: exit code 0, added to `dependencies`.
 import { describe, it, expect } from 'vitest'
 import JSZip from 'jszip'
 import { buildEpub } from './epubExport'
-
-const TINY_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII='
-
-function decodeBase64(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
+import { decodeBase64Png } from '../test/pngFixture'
 
 describe('buildEpub', () => {
   it('produces a valid EPUB3 package with one xhtml+image pair per page', async () => {
-    const png = decodeBase64(TINY_PNG_BASE64)
+    const png = decodeBase64Png()
     const pages = [
       { png, width: 2, height: 1 },
       { png, width: 2, height: 1 },
@@ -915,7 +917,7 @@ describe('buildEpub', () => {
   })
 
   it('escapes XML-unsafe characters in metadata', async () => {
-    const png = decodeBase64(TINY_PNG_BASE64)
+    const png = decodeBase64Png()
     const bytes = await buildEpub([{ png, width: 2, height: 1 }], {
       title: 'A & B <Title>',
       author: 'X',
@@ -1056,6 +1058,8 @@ git add package.json package-lock.json src/lib/epubExport.ts src/lib/epubExport.
 git commit -m "feat: add buildEpub fixed-layout EPUB3 assembly via jszip"
 ```
 
+(`src/test/pngFixture.ts` was already created and committed in Task 6 — nothing new to stage for it here.)
+
 ---
 
 ### Task 8: Export worker — `exportCore` (testable handler logic) + `exportWorker` (thin real entry)
@@ -1085,23 +1089,14 @@ import { runExport } from './exportCore'
 import { PDFDocument } from 'pdf-lib'
 import JSZip from 'jszip'
 import type { RawImage } from '../types'
-
-const TINY_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII='
-
-function decodeBase64(base64: string): Uint8Array {
-  const binary = atob(base64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-  return bytes
-}
+import { decodeBase64Png } from '../test/pngFixture'
 
 function rawImage(w: number, h: number): RawImage {
   return { data: new Uint8ClampedArray(w * h * 4).fill(128), width: w, height: h }
 }
 
 describe('runExport', () => {
-  const fixturePng = decodeBase64(TINY_PNG_BASE64)
+  const fixturePng = decodeBase64Png()
   const fakeEncode = vi.fn(async (_image: RawImage) => fixturePng)
 
   it('applies adjustment to every page, encodes it, then builds a PDF', async () => {
