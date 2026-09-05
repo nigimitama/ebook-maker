@@ -9,6 +9,10 @@ export interface PageEntry {
   id: string
   order: number
   blobId: string
+  // Small copy of the original, used to paint the page list. Optional because
+  // pages stored before thumbnails existed don't have one; those are backfilled
+  // on load. `blobId` always points at the untouched original.
+  thumbBlobId?: string
   width: number
   height: number
   adjustment: AdjustmentParams

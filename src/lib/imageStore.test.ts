@@ -61,4 +61,45 @@ describe('ImageStore', () => {
     expect(pages.map((p) => p.id)).toEqual([merged.id, p3.id])
     expect(pages[0].width).toBe(10)
   })
+
+  it('stores a thumbnail alongside the original, under a separate key', async () => {
+    const page = await store.addPage(blob(1), 5, 5, blob(7))
+    expect(page.thumbBlobId).toBeDefined()
+    expect(page.thumbBlobId).not.toBe(page.blobId)
+    const thumb = await store.getBlob(page.thumbBlobId!)
+    expect(Array.from(new Uint8Array(await thumb!.arrayBuffer()))).toEqual([7])
+    const original = await store.getBlob(page.blobId)
+    expect(Array.from(new Uint8Array(await original!.arrayBuffer()))).toEqual([1])
+  })
+
+  it('leaves thumbBlobId unset for a page added without a thumbnail', async () => {
+    const page = await store.addPage(blob(1), 5, 5)
+    expect(page.thumbBlobId).toBeUndefined()
+  })
+
+  it('backfills a thumbnail onto a page stored without one', async () => {
+    const page = await store.addPage(blob(1), 5, 5)
+    const thumbBlobId = await store.setThumbnail(page.id, blob(8))
+    const [updated] = await store.listPages()
+    expect(updated.thumbBlobId).toBe(thumbBlobId)
+    const thumb = await store.getBlob(thumbBlobId)
+    expect(Array.from(new Uint8Array(await thumb!.arrayBuffer()))).toEqual([8])
+  })
+
+  it('deletes the thumbnail along with the page and its original', async () => {
+    const page = await store.addPage(blob(1), 5, 5, blob(7))
+    await store.deletePage(page.id)
+    expect(await store.getBlob(page.blobId)).toBeUndefined()
+    expect(await store.getBlob(page.thumbBlobId!)).toBeUndefined()
+  })
+
+  it('deletes both source thumbnails when merging and stores the merged one', async () => {
+    const p1 = await store.addPage(blob(1), 5, 5, blob(11))
+    const p2 = await store.addPage(blob(2), 5, 5, blob(12))
+    const merged = await store.replacePagesWithMerged([p1.id, p2.id], blob(99), 10, 5, blob(13))
+    expect(await store.getBlob(p1.thumbBlobId!)).toBeUndefined()
+    expect(await store.getBlob(p2.thumbBlobId!)).toBeUndefined()
+    const thumb = await store.getBlob(merged.thumbBlobId!)
+    expect(Array.from(new Uint8Array(await thumb!.arrayBuffer()))).toEqual([13])
+  })
 })

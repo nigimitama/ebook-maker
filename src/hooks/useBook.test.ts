@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor, cleanup } from '@testing-library/react'
 import { Blob as NodeBlob, File as NodeFile } from 'node:buffer'
 import type { RawImage } from '../types'
+import { fitWithin } from '../lib/previewSizes'
 
 // fake-indexeddb structured-clones values through Node's implementation, which
 // preserves a node:buffer Blob but flattens a jsdom one into a plain object
@@ -37,8 +38,36 @@ async function decodeFake(blob: Blob): Promise<RawImage> {
   return { data: Uint8ClampedArray.from(parsed.data), width: parsed.w, height: parsed.h }
 }
 
+// Mirrors downscaleImage's contract without a canvas: nearest-neighbour
+// resample to the same target `fitWithin` picks, and report the untouched
+// original's dimensions (which is what the exported page size comes from).
+async function downscaleFake(blob: Blob, maxEdge: number) {
+  const source = await decodeFake(blob)
+  const target = fitWithin(source.width, source.height, maxEdge)
+  const data = new Uint8ClampedArray(target.width * target.height * 4)
+  for (let y = 0; y < target.height; y += 1) {
+    for (let x = 0; x < target.width; x += 1) {
+      const sx = Math.min(source.width - 1, Math.floor((x * source.width) / target.width))
+      const sy = Math.min(source.height - 1, Math.floor((y * source.height) / target.height))
+      const from = (sy * source.width + sx) * 4
+      const to = (y * target.width + x) * 4
+      data.set(source.data.subarray(from, from + 4), to)
+    }
+  }
+  const image: RawImage = { data, width: target.width, height: target.height }
+  return {
+    image,
+    originalWidth: source.width,
+    originalHeight: source.height,
+    toBlob: async () => encodeFake(image),
+  }
+}
+
 vi.mock('../lib/decodeImage', () => ({
   decodeBlobToRawImage: (blob: Blob) => decodeFake(blob),
+}))
+vi.mock('../lib/downscaleImage', () => ({
+  downscale: (blob: Blob, maxEdge: number) => downscaleFake(blob, maxEdge),
 }))
 vi.mock('../lib/encodeImage', () => ({
   encodeRawImageToPng: async (image: RawImage) => encodeFake(image),
