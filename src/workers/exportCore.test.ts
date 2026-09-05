@@ -12,19 +12,24 @@ function rawImage(w: number, h: number): RawImage {
 describe('runExport', () => {
   const fixturePng = decodeBase64Png()
   const fakeEncode = vi.fn(async (_image: RawImage) => fixturePng)
+  // The real decoder needs createImageBitmap/canvas; inject a fake that
+  // ignores the blob and yields a fixed image so this stays a pure Node test.
+  const fakeDecode = vi.fn(async (_blob: Blob) => rawImage(2, 1))
 
-  it('applies adjustment to every page, encodes it, then builds a PDF', async () => {
+  it('decodes each page blob, applies its adjustment, encodes it, then builds a PDF', async () => {
     const bytes = await runExport(
       {
         format: 'pdf',
         metadata: { title: 'T', author: 'A' },
         pages: [
-          { image: rawImage(2, 1), adjustment: { brightness: 0, contrast: 0 } },
-          { image: rawImage(2, 1), adjustment: { brightness: 10, contrast: 10 } },
+          { blob: new Blob(['a']), adjustment: { brightness: 0, contrast: 0 } },
+          { blob: new Blob(['b']), adjustment: { brightness: 10, contrast: 10 } },
         ],
       },
       fakeEncode,
+      fakeDecode,
     )
+    expect(fakeDecode).toHaveBeenCalledTimes(2)
     expect(fakeEncode).toHaveBeenCalledTimes(2)
     const doc = await PDFDocument.load(bytes)
     expect(doc.getPageCount()).toBe(2)
@@ -36,9 +41,10 @@ describe('runExport', () => {
       {
         format: 'epub',
         metadata: { title: 'T2', author: 'A2' },
-        pages: [{ image: rawImage(2, 1), adjustment: { brightness: 0, contrast: 0 } }],
+        pages: [{ blob: new Blob(['a']), adjustment: { brightness: 0, contrast: 0 } }],
       },
       fakeEncode,
+      fakeDecode,
     )
     const zip = await JSZip.loadAsync(bytes)
     expect(await zip.file('mimetype')!.async('string')).toBe('application/epub+zip')
