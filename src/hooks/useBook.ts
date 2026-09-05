@@ -46,6 +46,7 @@ const RAW_IMAGE_CACHE_LIMIT = 4
 
 export function useBook(): UseBookResult {
   const storeRef = useRef<ImageStore | null>(null)
+  const storeOpeningRef = useRef<Promise<ImageStore> | null>(null)
   const rawImagesRef = useRef<Map<string, RawImage>>(new Map())
   const selectedPageIdRef = useRef<string | null>(null)
   const [pages, setPages] = useState<PageEntry[]>([])
@@ -59,14 +60,27 @@ export function useBook(): UseBookResult {
 
   useEffect(() => {
     let cancelled = false
-    ImageStore.open()
+    const opening = ImageStore.open()
+    storeOpeningRef.current = opening
+    opening
       .then(async (store) => {
+        if (cancelled) return
+        storeRef.current = store
+        const loaded = await store.listPages()
+        // Object URLs live only for the lifetime of a document, so after a
+        // reload the pages restored from IndexedDB have no thumbnail unless
+        // we mint one here — otherwise every <img> renders broken.
+        const restored: Record<string, string> = {}
+        for (const page of loaded) {
+          const blob = await store.getBlob(page.blobId)
+          if (blob) restored[page.id] = URL.createObjectURL(blob)
+        }
         if (cancelled) {
-          store.close()
+          for (const url of Object.values(restored)) URL.revokeObjectURL(url)
           return
         }
-        storeRef.current = store
-        setPages(await store.listPages())
+        setThumbnails(restored)
+        setPages(loaded)
       })
       .catch(() => {
         if (!cancelled) {
@@ -75,7 +89,18 @@ export function useBook(): UseBookResult {
       })
     return () => {
       cancelled = true
-      storeRef.current?.close()
+      opening.then((store) => store.close()).catch(() => {})
+    }
+  }, [])
+
+  // Actions can fire before IndexedDB finishes opening (a user dropping files
+  // onto a freshly loaded page); await the open instead of silently no-oping.
+  const getStore = useCallback(async (): Promise<ImageStore | null> => {
+    if (storeRef.current) return storeRef.current
+    try {
+      return (await storeOpeningRef.current) ?? null
+    } catch {
+      return null
     }
   }, [])
 
@@ -129,7 +154,7 @@ export function useBook(): UseBookResult {
 
   const importFiles = useCallback(
     async (files: File[]) => {
-      const store = storeRef.current
+      const store = await getStore()
       if (!store) return
       // Decoded pixels are deliberately NOT cached for every imported file —
       // only the first page, which is about to be shown in the editor.
@@ -167,7 +192,7 @@ export function useBook(): UseBookResult {
         setSelectedImage(firstNew.raw)
       }
     },
-    [refreshPages, selectedPageId, setSelected, cacheRawImage],
+    [refreshPages, selectedPageId, setSelected, cacheRawImage, getStore],
   )
 
   const selectPage = useCallback(
