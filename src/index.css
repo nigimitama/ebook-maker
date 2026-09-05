@@ -8,6 +8,9 @@
   --danger: #b3261e;
   --danger-bg: #fdecea;
 
+  /* Keeps native widgets (range sliders, radios, scrollbars) themed to match
+     the palette below instead of staying light against a dark background. */
+  color-scheme: light dark;
   font: 16px/1.5 system-ui, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
   color: var(--text);
   background: var(--bg);

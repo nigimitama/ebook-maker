@@ -102,7 +102,10 @@ export function useBook(): UseBookResult {
           for (const url of Object.values(restored)) URL.revokeObjectURL(url)
           return
         }
-        setThumbnails(restored)
+        // Merge rather than replace: an import can complete while this effect
+        // is still awaiting listPages/getBlob, and replacing would wipe (and
+        // leak) the thumbnail it just created.
+        setThumbnails((current) => ({ ...restored, ...current }))
         setPages(loaded)
       })
       .catch(() => {
