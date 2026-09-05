@@ -5,6 +5,7 @@ import { encodeRawImageToPng } from '../lib/encodeImage'
 import { computeAutoAdjustment } from '../lib/autoAdjust'
 import { mergeSpread } from '../lib/mergeSpread'
 import { runExportInWorker } from '../lib/exportRunner'
+import type { ExportRequestPage } from '../workers/exportCore'
 import type { AdjustmentParams, BookMetadata, PageEntry, RawImage } from '../types'
 
 export interface UseBookResult {
@@ -24,9 +25,17 @@ export interface UseBookResult {
   exportBook: (format: 'pdf' | 'epub') => Promise<Blob>
 }
 
+// Decoded RGBA pixels are huge (~15MB for one A4 scan), so at the spec's
+// 200-page scale they cannot all be held at once. Keep only a handful of
+// recently used pages; anything else is re-decoded from its stored Blob on
+// demand. Map iteration order is insertion order, so delete-then-set on
+// access gives cheap LRU semantics with the oldest entry first.
+const RAW_IMAGE_CACHE_LIMIT = 4
+
 export function useBook(): UseBookResult {
   const storeRef = useRef<ImageStore | null>(null)
   const rawImagesRef = useRef<Map<string, RawImage>>(new Map())
+  const selectedPageIdRef = useRef<string | null>(null)
   const [pages, setPages] = useState<PageEntry[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [metadata, setMetadata] = useState<BookMetadata>({ title: '', author: '' })
@@ -55,47 +64,81 @@ export function useBook(): UseBookResult {
     setPages(await store.listPages())
   }, [])
 
-  const ensureRawImage = useCallback(async (page: PageEntry): Promise<RawImage> => {
-    const cached = rawImagesRef.current.get(page.id)
-    if (cached) return cached
-    const store = storeRef.current!
-    const blob = await store.getBlob(page.blobId)
-    const raw = await decodeBlobToRawImage(blob!)
-    rawImagesRef.current.set(page.id, raw)
-    return raw
+  const setSelected = useCallback((id: string | null) => {
+    selectedPageIdRef.current = id
+    setSelectedPageId(id)
   }, [])
+
+  // Insert (or refresh) an entry as most-recently-used, then evict the
+  // oldest entries that are neither the selected page nor the one just used.
+  const cacheRawImage = useCallback((id: string, raw: RawImage) => {
+    const cache = rawImagesRef.current
+    cache.delete(id)
+    cache.set(id, raw)
+    while (cache.size > RAW_IMAGE_CACHE_LIMIT) {
+      let victim: string | undefined
+      for (const key of cache.keys()) {
+        if (key !== id && key !== selectedPageIdRef.current) {
+          victim = key
+          break
+        }
+      }
+      if (victim === undefined) break
+      cache.delete(victim)
+    }
+  }, [])
+
+  const ensureRawImage = useCallback(
+    async (page: PageEntry): Promise<RawImage> => {
+      const cached = rawImagesRef.current.get(page.id)
+      if (cached) {
+        cacheRawImage(page.id, cached)
+        return cached
+      }
+      const store = storeRef.current
+      if (!store) throw new Error('store not ready')
+      const blob = await store.getBlob(page.blobId)
+      if (!blob) throw new Error(`image data not found for page: ${page.id}`)
+      const raw = await decodeBlobToRawImage(blob)
+      cacheRawImage(page.id, raw)
+      return raw
+    },
+    [cacheRawImage],
+  )
 
   const importFiles = useCallback(
     async (files: File[]) => {
       const store = storeRef.current
       if (!store) return
-      let firstNewId: string | null = null
+      // Decoded pixels are deliberately NOT cached for every imported file —
+      // only the first page, which is about to be shown in the editor.
+      let firstNew: { id: string; raw: RawImage } | null = null
       for (const file of files) {
         const raw = await decodeBlobToRawImage(file)
         const page = await store.addPage(file, raw.width, raw.height)
-        rawImagesRef.current.set(page.id, raw)
         const auto = computeAutoAdjustment(raw)
         await store.updateAdjustment(page.id, auto)
         setThumbnails((current) => ({ ...current, [page.id]: URL.createObjectURL(file) }))
-        if (!firstNewId) firstNewId = page.id
+        if (!firstNew) firstNew = { id: page.id, raw }
       }
       await refreshPages()
-      if (firstNewId && !selectedPageId) {
-        setSelectedPageId(firstNewId)
-        setSelectedImage(rawImagesRef.current.get(firstNewId) ?? null)
+      if (firstNew && !selectedPageId) {
+        setSelected(firstNew.id)
+        cacheRawImage(firstNew.id, firstNew.raw)
+        setSelectedImage(firstNew.raw)
       }
     },
-    [refreshPages, selectedPageId],
+    [refreshPages, selectedPageId, setSelected, cacheRawImage],
   )
 
   const selectPage = useCallback(
     async (id: string) => {
       const page = pages.find((p) => p.id === id)
       if (!page) return
-      setSelectedPageId(id)
+      setSelected(id)
       setSelectedImage(await ensureRawImage(page))
     },
-    [pages, ensureRawImage],
+    [pages, ensureRawImage, setSelected],
   )
 
   const updateAdjustment = useCallback(
@@ -146,12 +189,12 @@ export function useBook(): UseBookResult {
         return next
       })
       if (selectedPageId === id) {
-        setSelectedPageId(null)
+        setSelected(null)
         setSelectedImage(null)
       }
       await refreshPages()
     },
-    [refreshPages, selectedPageId],
+    [refreshPages, selectedPageId, setSelected],
   )
 
   const confirmMerge = useCallback(
@@ -173,7 +216,7 @@ export function useBook(): UseBookResult {
       )
       rawImagesRef.current.delete(firstId)
       rawImagesRef.current.delete(secondId)
-      rawImagesRef.current.set(mergedEntry.id, merged)
+      cacheRawImage(mergedEntry.id, merged)
       setThumbnails((current) => {
         const next = { ...current }
         if (next[firstId]) URL.revokeObjectURL(next[firstId])
@@ -184,27 +227,30 @@ export function useBook(): UseBookResult {
         return next
       })
       if (selectedPageId === firstId || selectedPageId === secondId) {
-        setSelectedPageId(mergedEntry.id)
+        setSelected(mergedEntry.id)
         setSelectedImage(merged)
       }
       await refreshPages()
     },
-    [pages, refreshPages, selectedPageId, ensureRawImage],
+    [pages, refreshPages, selectedPageId, ensureRawImage, cacheRawImage, setSelected],
   )
 
   const exportBook = useCallback(
     async (format: 'pdf' | 'epub') => {
       const store = storeRef.current
       if (!store) throw new Error('store not ready')
+      // Send the stored Blobs, not decoded pixels: the worker decodes each
+      // page itself, so nothing here holds a full book's RGBA data at once.
       const currentPages = await store.listPages()
-      const exportPages = []
+      const exportPages: ExportRequestPage[] = []
       for (const page of currentPages) {
-        const raw = await ensureRawImage(page)
-        exportPages.push({ image: raw, adjustment: page.adjustment })
+        const blob = await store.getBlob(page.blobId)
+        if (!blob) throw new Error(`image data not found for page: ${page.id}`)
+        exportPages.push({ blob, adjustment: page.adjustment })
       }
       return runExportInWorker({ format, metadata, pages: exportPages })
     },
-    [metadata, ensureRawImage],
+    [metadata],
   )
 
   return {
