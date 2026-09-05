@@ -21,6 +21,7 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
   return (
     <div
       data-testid="import-dropzone"
+      className="dropzone"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault()

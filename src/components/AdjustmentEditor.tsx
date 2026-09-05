@@ -29,37 +29,43 @@ export function AdjustmentEditor({
   }, [image, adjustment])
 
   return (
-    <div>
-      <canvas ref={canvasRef} data-testid="adjustment-canvas" />
-      <label>
-        明るさ
-        <input
-          type="range"
-          min={-100}
-          max={100}
-          value={adjustment.brightness}
-          data-testid="brightness-slider"
-          onChange={(event) =>
-            onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
-          }
-        />
-      </label>
-      <label>
-        コントラスト
-        <input
-          type="range"
-          min={-100}
-          max={100}
-          value={adjustment.contrast}
-          data-testid="contrast-slider"
-          onChange={(event) =>
-            onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
-          }
-        />
-      </label>
-      <button type="button" onClick={onApplyToAllPages}>
-        他のページにも適用
-      </button>
+    <div className="panel">
+      <canvas
+        ref={canvasRef}
+        data-testid="adjustment-canvas"
+        className="adjustment-editor__canvas"
+      />
+      <div className="adjustment-editor__controls">
+        <label>
+          明るさ
+          <input
+            type="range"
+            min={-100}
+            max={100}
+            value={adjustment.brightness}
+            data-testid="brightness-slider"
+            onChange={(event) =>
+              onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
+            }
+          />
+        </label>
+        <label>
+          コントラスト
+          <input
+            type="range"
+            min={-100}
+            max={100}
+            value={adjustment.contrast}
+            data-testid="contrast-slider"
+            onChange={(event) =>
+              onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
+            }
+          />
+        </label>
+        <button type="button" onClick={onApplyToAllPages}>
+          他のページにも適用
+        </button>
+      </div>
     </div>
   )
 }

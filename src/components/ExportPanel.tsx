@@ -27,7 +27,8 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
   }
 
   return (
-    <div>
+    <div className="panel">
+      <div className="export-panel__formats">
       <label>
         <input
           type="radio"
@@ -48,11 +49,16 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
         />
         EPUB
       </label>
+      </div>
       <button type="button" onClick={handleExport} disabled={status === 'running'}>
         書き出し
       </button>
       {status === 'running' && <p data-testid="export-progress">生成中...</p>}
-      {status === 'error' && <p data-testid="export-error">{errorMessage}</p>}
+      {status === 'error' && (
+        <p data-testid="export-error" className="export-panel__error">
+          {errorMessage}
+        </p>
+      )}
       {status === 'done' && downloadUrl && (
         <a
           href={downloadUrl}

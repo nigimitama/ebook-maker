@@ -11,10 +11,10 @@ export function App() {
   const selectedPage = book.pages.find((p) => p.id === book.selectedPageId)
 
   return (
-    <div>
+    <div className="app">
       <h1>ebook-maker</h1>
       {book.error && (
-        <div role="alert" data-testid="error-banner">
+        <div role="alert" data-testid="error-banner" className="error-banner">
           <span>{book.error}</span>
           <button type="button" onClick={book.clearError}>
             閉じる
