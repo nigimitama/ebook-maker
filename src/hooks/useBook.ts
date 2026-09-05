@@ -3,6 +3,7 @@ import { ImageStore } from '../lib/imageStore'
 import { decodeBlobToRawImage } from '../lib/decodeImage'
 import { encodeRawImageToPng } from '../lib/encodeImage'
 import { computeAutoAdjustment } from '../lib/autoAdjust'
+import { applyAdjustment } from '../lib/applyAdjustment'
 import { mergeSpread } from '../lib/mergeSpread'
 import { runExportInWorker } from '../lib/exportRunner'
 import type { ExportRequestPage } from '../workers/exportCore'
@@ -242,8 +243,12 @@ export function useBook(): UseBookResult {
       const first = pages.find((p) => p.id === firstId)
       const second = pages.find((p) => p.id === secondId)
       if (!first || !second) return
-      const rawFirst = await ensureRawImage(first)
-      const rawSecond = await ensureRawImage(second)
+      // Bake each source page's own brightness/contrast into the merged
+      // pixels — the originals are deleted by the merge, so an unadjusted
+      // merge would silently discard whatever the user had dialled in. The
+      // merged entry's own adjustment then correctly starts at 0/0.
+      const rawFirst = applyAdjustment(await ensureRawImage(first), first.adjustment)
+      const rawSecond = applyAdjustment(await ensureRawImage(second), second.adjustment)
       const merged = mergeSpread(rawFirst, rawSecond)
       const blob = await encodeRawImageToPng(merged)
       const mergedEntry = await store.replacePagesWithMerged(
