@@ -43,7 +43,11 @@ function nextId(): string {
 }
 
 export class ImageStore {
-  private constructor(private db: IDBDatabase) {}
+  private db: IDBDatabase
+
+  private constructor(db: IDBDatabase) {
+    this.db = db
+  }
 
   static async open(dbName = 'ebook-maker'): Promise<ImageStore> {
     const db = await openDb(dbName)
@@ -120,7 +124,7 @@ export class ImageStore {
     height: number,
   ): Promise<PageEntry> {
     const pages = await this.listPages()
-    const [firstId, secondId] = removeIds
+    const [firstId] = removeIds
     const firstIndex = pages.findIndex((p) => p.id === firstId)
     if (firstIndex === -1) throw new Error(`page not found: ${firstId}`)
     const removed = new Set(removeIds)
