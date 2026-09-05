@@ -10,3 +10,10 @@ if (!window.URL.createObjectURL) {
 if (!window.URL.revokeObjectURL) {
   window.URL.revokeObjectURL = () => {}
 }
+
+// jsdom does not implement canvas 2D rendering and logs a noisy
+// "Not implemented" warning every time getContext('2d') is called.
+// Stub it to return null directly — application code already handles
+// a null 2D context (see AdjustmentEditor's draw effect) — so tests
+// stay pristine instead of printing that warning on every render.
+HTMLCanvasElement.prototype.getContext = (() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext
