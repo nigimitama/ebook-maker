@@ -1,9 +1,9 @@
 import '@testing-library/jest-dom/vitest'
 import 'fake-indexeddb/auto'
 
-// jsdom does not implement URL.createObjectURL/revokeObjectURL — stub them
-// so components that create download links (ExportPanel, Task 13) can be
-// unit tested without a real Blob URL.
+// jsdomは URL.createObjectURL/revokeObjectURL を実装していないため差し替える。
+// ダウンロードリンクを生成するコンポーネント(ExportPanel)を、実際のBlob URLなしで
+// ユニットテストできるようにするため。
 if (!window.URL.createObjectURL) {
   window.URL.createObjectURL = () => 'blob:mock-url'
 }
@@ -11,9 +11,8 @@ if (!window.URL.revokeObjectURL) {
   window.URL.revokeObjectURL = () => {}
 }
 
-// jsdom does not implement canvas 2D rendering and logs a noisy
-// "Not implemented" warning every time getContext('2d') is called.
-// Stub it to return null directly — application code already handles
-// a null 2D context (see AdjustmentEditor's draw effect) — so tests
-// stay pristine instead of printing that warning on every render.
+// jsdomはcanvasの2D描画を実装しておらず、getContext('2d')を呼ぶたびに
+// "Not implemented" 警告を出力する。アプリ側はnullの2Dコンテキストを
+// 既に正しく扱っている(AdjustmentEditorの描画effectを参照)ので、
+// 直接nullを返すよう差し替え、描画のたびに警告が出るのを防ぐ。
 HTMLCanvasElement.prototype.getContext = (() => null) as unknown as typeof HTMLCanvasElement.prototype.getContext

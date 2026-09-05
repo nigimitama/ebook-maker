@@ -22,7 +22,7 @@ describe('computeAutoAdjustment', () => {
   })
 
   it('boosts contrast for a low-contrast (narrow range) scan', () => {
-    // all values packed into 100..150 — a washed-out scan
+    // 全画素が100..150に固まっている、コントラストの浅いスキャン
     const values = Array.from({ length: 51 }, (_, i) => 100 + i)
     const result = computeAutoAdjustment(image(values))
     expect(result.contrast).toBeGreaterThan(0)

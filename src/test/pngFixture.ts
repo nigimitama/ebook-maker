@@ -1,7 +1,7 @@
-// A hand-built valid 2x1 PNG (red pixel, green pixel), generated and
-// verified against pdf-lib's embedPng at plan-authoring time. Shared by
-// pdfExport.test.ts, epubExport.test.ts, and exportCore.test.ts so the
-// fixture bytes and decoder are defined in exactly one place.
+// 手組みした正しい2x1 PNG(赤1画素、緑1画素)。計画策定時にpdf-libの
+// embedPngで読めることを確認済み。pdfExport.test.ts / epubExport.test.ts /
+// exportCore.test.ts で共有し、フィクスチャのバイト列とデコーダの定義を
+// 1箇所にまとめている。
 export const TINY_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAIAAAABCAYAAAD0In+KAAAADklEQVR4nGP4z8DwHwQBEPgD/U6VwW8AAAAASUVORK5CYII='
 

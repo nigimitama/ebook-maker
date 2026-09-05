@@ -25,10 +25,10 @@ describe('applyAdjustment', () => {
   })
 
   it('applies contrast around the midpoint (128)', () => {
-    // contrast=100 => factor 2: (200-128)*2+128 = 272 -> clamped to 255
+    // contrast=100 は係数2: (200-128)*2+128 = 272 → 255に丸められる
     const out = applyAdjustment(gray(200), { brightness: 0, contrast: 100 })
     expect(out.data[0]).toBe(255)
-    // contrast=-100 => factor 0: any value collapses to 128
+    // contrast=-100 は係数0: どの値も128に収束する
     const out2 = applyAdjustment(gray(200), { brightness: 0, contrast: -100 })
     expect(out2.data[0]).toBe(128)
   })

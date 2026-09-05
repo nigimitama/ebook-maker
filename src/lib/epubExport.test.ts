@@ -26,8 +26,8 @@ describe('buildEpub', () => {
     expect(opf).toContain('rendition:layout')
     expect(opf).toContain('pre-paginated')
 
-    // EPUB 3 requires exactly one dcterms:modified, in CCYY-MM-DDThh:mm:ssZ
-    // form with no milliseconds, or epubcheck rejects the package.
+    // EPUB 3は dcterms:modified を、ミリ秒なしの CCYY-MM-DDThh:mm:ssZ 形式で
+    // ちょうど1つ要求する。満たさないとepubcheckがパッケージを弾く。
     expect(opf).toMatch(/dcterms:modified">\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z</)
     expect(opf.match(/property="dcterms:modified"/g)).toHaveLength(1)
 

@@ -1,6 +1,6 @@
 export interface AdjustmentParams {
-  brightness: number // -100..100, 0 = no change
-  contrast: number // -100..100, 0 = no change
+  brightness: number // -100..100、0で変化なし
+  contrast: number // -100..100、0で変化なし
 }
 
 export const DEFAULT_ADJUSTMENT: AdjustmentParams = { brightness: 0, contrast: 0 }
@@ -9,9 +9,9 @@ export interface PageEntry {
   id: string
   order: number
   blobId: string
-  // Small copy of the original, used to paint the page list. Optional because
-  // pages stored before thumbnails existed don't have one; those are backfilled
-  // on load. `blobId` always points at the untouched original.
+  // ページ一覧の描画に使う原本の縮小版。サムネイル導入前に保存された
+  // ページは持たないため任意。読み込み時に生成して埋める。
+  // `blobId` は常に無加工の原本を指す。
   thumbBlobId?: string
   width: number
   height: number
@@ -23,12 +23,12 @@ export interface BookMetadata {
   author: string
 }
 
-// Structurally compatible with DOM ImageData ({data, width, height}), but
-// defined locally so pure image-processing functions can be unit tested
-// without a browser/canvas — jsdom does not implement ImageData (verified
-// against jsdom 30: `new window.ImageData(...)` throws "not a constructor").
-// A real `CanvasRenderingContext2D.getImageData()` result satisfies this
-// interface as-is; no conversion needed at runtime.
+// DOMの ImageData ({data, width, height}) と構造的に互換だが、画像処理の
+// 純関数をブラウザ/canvasなしでユニットテストできるよう独自に定義している。
+// jsdomは ImageData を実装していない(jsdom 30で確認: `new window.ImageData(...)`
+// は "not a constructor" を投げる)。実際の
+// `CanvasRenderingContext2D.getImageData()` の結果はそのままこの型を満たすので、
+// 実行時の変換は不要。
 export interface RawImage {
   data: Uint8ClampedArray
   width: number

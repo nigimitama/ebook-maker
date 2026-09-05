@@ -1,6 +1,6 @@
-// Type-checked by tsconfig.worker.json, which supplies the WebWorker lib in
-// place of DOM (a `/// <reference lib="webworker" />` here would leak those
-// globals into the app project, which shares this file's imports).
+// 型チェックは tsconfig.worker.json が担当し、DOMの代わりにWebWorkerのlibを
+// 与える(ここに `/// <reference lib="webworker" />` を書くと、このファイルの
+// importを共有するappプロジェクト側にWorkerのグローバルが漏れてしまう)。
 import { runExport } from './exportCore'
 import type { ExportRequest } from './exportCore'
 import type { RawImage } from '../types'
@@ -15,8 +15,9 @@ function encodePngViaCanvas(image: RawImage): Promise<Uint8Array> {
   })
 }
 
-// Mirrors src/lib/decodeImage.ts, but with OffscreenCanvas instead of a DOM
-// <canvas> — both createImageBitmap and OffscreenCanvas exist in workers.
+// src/lib/decodeImage.ts と同じ処理を、DOMの<canvas>ではなく
+// OffscreenCanvasで行う。createImageBitmapとOffscreenCanvasはどちらも
+// Worker内で利用できる。
 async function decodeBlobViaCanvas(blob: Blob): Promise<RawImage> {
   const bitmap = await createImageBitmap(blob)
   try {

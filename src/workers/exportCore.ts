@@ -3,11 +3,11 @@ import { buildPdf, type ExportPage } from '../lib/pdfExport'
 import { buildEpub } from '../lib/epubExport'
 import type { AdjustmentParams, BookMetadata, RawImage } from '../types'
 
-// Pages travel to the worker as the ORIGINAL image Blob plus its adjustment
-// parameters, never as decoded RGBA pixels: structured clone copies a
-// Uint8ClampedArray byte-for-byte (~15MB per A4 scan, x200 pages), while a
-// Blob clones by reference to its already-stored data. Decoding happens
-// inside the worker, one page at a time, so peak memory stays bounded.
+// ページはデコード済みRGBA画素ではなく、原本のBlobと調整パラメータの形で
+// Workerへ渡す。構造化複製は Uint8ClampedArray をバイト単位でコピーする
+// (A4スキャン1枚あたり約15MB × 200ページ)のに対し、Blobは保存済みデータへの
+// 参照として複製されるため。デコードはWorker内で1ページずつ行うので、
+// ピーク時のメモリ使用量が抑えられる。
 export interface ExportRequestPage {
   blob: Blob
   adjustment: AdjustmentParams

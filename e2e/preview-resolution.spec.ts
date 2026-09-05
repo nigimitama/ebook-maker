@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { makeTinyPng } from './makeTinyPng'
 import { PREVIEW_MAX_EDGE, THUMBNAIL_MAX_EDGE } from '../src/lib/previewSizes'
 
-// A4 at 300dpi — what a real scanned page actually looks like.
+// A4を300dpiで取り込んだ寸法。実際のスキャンページはこの大きさになる。
 const SCAN_WIDTH = 2480
 const SCAN_HEIGHT = 3508
 
@@ -16,12 +16,12 @@ function writeScan(name: string): string {
   return path
 }
 
-// Previews are shown at a fraction of a scan's real size (thumbnails around
-// 140px tall, the adjustment canvas a few hundred px wide). Decoding the
-// full-resolution original for them costs ~500x more pixels than get painted,
-// which made the page list crawl on real scans. These assertions pin the
-// downscaling in place: they read the actual decoded/backing resolution, so
-// they fail if a preview ever goes back to using the original.
+// プレビューはスキャンの実サイズより大幅に小さく表示される(サムネイルは
+// 高さ約140px、調整キャンバスは幅数百px)。そのために原本をフル解像度で
+// デコードすると実際に描画する画素の約500倍を処理することになり、実物の
+// スキャンではページ一覧が這うように遅くなっていた。このテストは縮小処理を
+// 固定する: 実際のデコード解像度/バッキングサイズを読むので、
+// どちらかのプレビューが原本を使う実装に戻れば失敗する。
 test('previews are downscaled, not full-resolution originals', async ({ page }) => {
   await page.goto('/')
   await page.setInputFiles('[data-testid="file-input"]', [writeScan('scan.png')])
@@ -37,7 +37,7 @@ test('previews are downscaled, not full-resolution originals', async ({ page }) 
   })
   expect(thumb.width).toBeLessThanOrEqual(THUMBNAIL_MAX_EDGE)
   expect(thumb.height).toBeLessThanOrEqual(THUMBNAIL_MAX_EDGE)
-  // Aspect ratio preserved (portrait stays portrait).
+  // アスペクト比が保たれている(縦長は縦長のまま)。
   expect(thumb.height).toBeGreaterThan(thumb.width)
 
   await page.locator('.page-list__thumb').first().click()
@@ -57,9 +57,9 @@ test('previews are downscaled, not full-resolution originals', async ({ page }) 
   expect(canvas.height).toBeGreaterThan(canvas.width)
 })
 
-// The export must still use the full-resolution original — downscaling is a
-// display concern only. A PDF built from the downscaled preview would silently
-// ship a blurry book.
+// 書き出しは原本のフル解像度を使い続けなければならない。縮小はあくまで
+// 表示上の都合であり、縮小プレビューからPDFを作ると気づかないうちに
+// ぼやけた本が出来上がる。
 test('export keeps the original resolution despite downscaled previews', async ({ page }) => {
   await page.goto('/')
   await page.setInputFiles('[data-testid="file-input"]', [writeScan('scan.png')])

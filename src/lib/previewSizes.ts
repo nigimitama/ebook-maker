@@ -1,14 +1,14 @@
-// Previews are painted far smaller than a scanned page really is: thumbnails
-// at roughly 140px tall, the adjustment canvas at a few hundred px wide. These
-// caps bound the long edge of the pixel data behind each, so a 2480x3508 scan
-// isn't decoded in full just to paint a 122x140 thumbnail.
+// プレビューはスキャン画像の実サイズよりはるかに小さく描画される
+// (サムネイルは高さ約140px、調整キャンバスは幅数百px)。この上限は各プレビューが
+// 抱える画素データの長辺を制限するためのもので、122x140のサムネイルを描くために
+// 2480x3508のスキャンをフルデコードする事態を防ぐ。
 //
-// Display only — merging and exporting keep using the original blob.
+// 表示専用 — 見開き結合と書き出しは原本のblobを使い続ける。
 export const THUMBNAIL_MAX_EDGE = 320
 export const PREVIEW_MAX_EDGE = 1200
 
-// Fits width x height inside a maxEdge square, preserving aspect ratio.
-// Never upscales: an image already smaller than the cap is left alone.
+// width x height を maxEdge の正方形に収める(アスペクト比は維持)。
+// 拡大はしない: 上限より小さい画像はそのまま返す。
 export function fitWithin(
   width: number,
   height: number,

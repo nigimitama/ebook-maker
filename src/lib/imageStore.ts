@@ -84,7 +84,7 @@ export class ImageStore {
     return page
   }
 
-  /** Attaches a thumbnail to a page stored before thumbnails existed. */
+  /** サムネイル導入前に保存されたページにサムネイルを付ける。 */
   async setThumbnail(id: string, thumbBlob: Blob): Promise<string> {
     const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
     const pageStore = tx.objectStore(PAGE_STORE)

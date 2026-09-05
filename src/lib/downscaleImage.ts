@@ -1,16 +1,16 @@
 import { fitWithin } from './previewSizes'
 import type { RawImage } from '../types'
 
-// Browser-only, like decodeImage/encodeImage: createImageBitmap resamples
-// during decode, so the full-resolution bitmap is never materialized. Covered
-// by the preview-resolution E2E test, not by unit tests.
+// decodeImage/encodeImageと同様にブラウザ専用。createImageBitmapがデコード時に
+// リサンプリングするため、フル解像度のビットマップは一度も生成されない。
+// ユニットテストではなく preview-resolution のE2Eテストで担保している。
 
 export interface Downscaled {
-  /** Downscaled pixels, for the adjustment canvas or a histogram. */
+  /** 縮小した画素。調整キャンバスの描画やヒストグラム算出に使う。 */
   image: RawImage
-  /** The same pixels as a PNG, for a thumbnail `<img>`. */
+  /** 同じ画素をPNGにしたもの。サムネイルの `<img>` 用。 */
   toBlob: () => Promise<Blob>
-  /** Dimensions of the untouched original — what the exported page must use. */
+  /** 無加工の原本の寸法。書き出すページはこの値を使う必要がある。 */
   originalWidth: number
   originalHeight: number
 }

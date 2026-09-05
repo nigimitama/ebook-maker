@@ -12,8 +12,8 @@ function rawImage(w: number, h: number): RawImage {
 describe('runExport', () => {
   const fixturePng = decodeBase64Png()
   const fakeEncode = vi.fn(async (_image: RawImage) => fixturePng)
-  // The real decoder needs createImageBitmap/canvas; inject a fake that
-  // ignores the blob and yields a fixed image so this stays a pure Node test.
+  // 本物のデコーダは createImageBitmap/canvas を必要とするため、blobを無視して
+  // 固定の画像を返すfakeを注入し、このテストを純粋なNode環境で完結させる。
   const fakeDecode = vi.fn(async (_blob: Blob) => rawImage(2, 1))
 
   it('decodes each page blob, applies its adjustment, encodes it, then builds a PDF', async () => {

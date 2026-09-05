@@ -27,9 +27,9 @@ function pseudoUuid(): string {
   })
 }
 
-// EPUB 3 requires exactly one dcterms:modified in CCYY-MM-DDThh:mm:ssZ form
-// (no milliseconds); without it epubcheck fails and strict readers such as
-// Apple Books and Kobo reject the file.
+// EPUB 3は CCYY-MM-DDThh:mm:ssZ 形式(ミリ秒なし)の dcterms:modified を
+// ちょうど1つ要求する。これがないとepubcheckが通らず、Apple BooksやKoboなど
+// 厳格なリーダーにファイルを弾かれる。
 function epubTimestamp(): string {
   return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
 }
@@ -63,9 +63,9 @@ function navXhtml(): string {
 `
 }
 
-// JSZip.folder() returns null only for a name it refuses (a regex-like
-// argument); every call here passes a plain literal, so a null is a bug in
-// this file rather than a condition to recover from.
+// JSZip.folder() がnullを返すのは受け付けない名前(正規表現的な引数)を
+// 渡した場合だけ。ここでの呼び出しはすべて素の文字列リテラルなので、
+// nullは回復すべき状態ではなくこのファイルのバグを意味する。
 function folder(zip: JSZip, name: string): JSZip {
   const created = zip.folder(name)
   if (!created) throw new Error(`failed to create zip folder: ${name}`)

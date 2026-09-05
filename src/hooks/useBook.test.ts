@@ -4,20 +4,20 @@ import { Blob as NodeBlob, File as NodeFile } from 'node:buffer'
 import type { RawImage } from '../types'
 import { fitWithin } from '../lib/previewSizes'
 
-// fake-indexeddb structured-clones values through Node's implementation, which
-// preserves a node:buffer Blob but flattens a jsdom one into a plain object
-// (imageStore.test.ts uses node:buffer for the same reason). jsdom's
-// URL.createObjectURL accepts both.
+// fake-indexeddb は値をNodeの構造化複製に通す。node:buffer の Blob は保たれるが、
+// jsdomの Blob はただのオブジェクトに潰れてしまう(imageStore.test.ts が
+// node:buffer を使っているのも同じ理由)。jsdomの URL.createObjectURL は
+// どちらも受け付ける。
 function blobOf(text: string, type: string): Blob {
   return new NodeBlob([text], { type }) as unknown as Blob
 }
 
-// The three browser-only dependencies useBook imports need a canvas
-// (createImageBitmap / getImageData / toBlob) and a real Worker, none of
-// which jsdom provides. Fake them with a trivial round-trippable "image
-// format" — JSON holding width, height and the RGBA bytes — so imports,
-// merges and exports can be driven end-to-end against a real ImageStore
-// backed by fake-indexeddb, and the resulting pixels can be asserted on.
+// useBook が読み込むブラウザ専用の依存は canvas
+// (createImageBitmap / getImageData / toBlob) と実際のWorkerを必要とするが、
+// jsdomはどちらも提供しない。幅・高さ・RGBAバイト列を持つJSONという
+// 往復可能な単純「画像フォーマット」でfakeを用意し、fake-indexeddb上の
+// 本物の ImageStore に対して取り込み・結合・書き出しを通しで動かせるようにする。
+// 結果の画素値もそのまま検証できる。
 interface FakeImageFile {
   w: number
   h: number
@@ -38,9 +38,9 @@ async function decodeFake(blob: Blob): Promise<RawImage> {
   return { data: Uint8ClampedArray.from(parsed.data), width: parsed.w, height: parsed.h }
 }
 
-// Mirrors downscaleImage's contract without a canvas: nearest-neighbour
-// resample to the same target `fitWithin` picks, and report the untouched
-// original's dimensions (which is what the exported page size comes from).
+// canvasなしで downscaleImage の契約を再現する: `fitWithin` が選ぶのと同じ
+// 目標サイズへ最近傍でリサンプリングし、無加工の原本の寸法を返す
+// (書き出すページのサイズはこの値から決まる)。
 async function downscaleFake(blob: Blob, maxEdge: number) {
   const source = await decodeFake(blob)
   const target = fitWithin(source.width, source.height, maxEdge)
@@ -99,13 +99,13 @@ vi.mock('../lib/exportRunner', () => ({
 const { useBook } = await import('./useBook')
 const { runExportInWorker } = await import('../lib/exportRunner')
 
-/** A 1x1 image file whose decoded pixel is exactly `pixel`. */
+/** デコードすると画素がちょうど `pixel` になる1x1の画像ファイル。 */
 function imageFile(name: string, pixel: [number, number, number, number]): File {
   const payload: FakeImageFile = { w: 1, h: 1, data: pixel }
   return new NodeFile([JSON.stringify(payload)], name, { type: 'image/png' }) as unknown as File
 }
 
-/** A file the fake decoder cannot parse — stands in for a corrupt scan. */
+/** fakeのデコーダが解釈できないファイル。壊れたスキャンの代わり。 */
 function corruptFile(name: string): File {
   return new NodeFile(['not an image'], name, { type: 'image/png' }) as unknown as File
 }
@@ -170,8 +170,8 @@ describe('useBook', () => {
     const importedIds = first.result.current.pages.map((p) => p.id)
     first.unmount()
 
-    // A fresh mount is what a page reload does: the same database, no
-    // in-memory state carried over.
+    // マウントし直すことでページのリロードを再現する: データベースは同じで、
+    // メモリ上の状態は引き継がれない。
     const reloaded = renderHook(() => useBook())
     await waitFor(() => expect(reloaded.result.current.pages).toHaveLength(2))
     expect(reloaded.result.current.pages.map((p) => p.id)).toEqual(importedIds)
@@ -203,11 +203,11 @@ describe('useBook', () => {
 
     await waitFor(() => expect(view.result.current.pages).toHaveLength(1))
     const merged = view.result.current.pages[0]
-    // The merged page carries no further adjustment: it is already baked in.
+    // 結合後のページに追加の調整値は乗らない: すでに画素へ焼き込まれている。
     expect(merged.adjustment).toEqual({ brightness: 0, contrast: 0 })
     expect(view.result.current.selectedImage).not.toBeNull()
 
-    // Left half brightened by 50, right half untouched.
+    // 左半分は明るさ+50、右半分は無調整のまま。
     const pixels = view.result.current.selectedImage!.data
     expect(Array.from(pixels.slice(0, 4))).toEqual([60, 70, 80, 255])
     expect(Array.from(pixels.slice(4, 8))).toEqual([40, 50, 60, 255])
@@ -249,15 +249,15 @@ describe('useBook', () => {
     const pageId = view.result.current.pages[0].id
 
     await act(async () => {
-      // Three ticks of a slider drag: one debounced write, not three.
+      // スライダー操作3目盛分。書き込みは遅延されて3回ではなく1回になる。
       await view.result.current.updateAdjustment(pageId, { brightness: 10, contrast: 0 })
       await view.result.current.updateAdjustment(pageId, { brightness: 20, contrast: 0 })
       await view.result.current.updateAdjustment(pageId, { brightness: 30, contrast: 0 })
     })
-    // Local state is current immediately, with no round-trip.
+    // ローカル状態は往復なしで即座に最新になる。
     expect(view.result.current.pages[0].adjustment).toEqual({ brightness: 30, contrast: 0 })
 
-    // Exporting before the debounce elapses must still see the latest value.
+    // 遅延時間が経つ前に書き出しても、最新の値が反映されていること。
     await act(async () => {
       await view.result.current.exportBook('pdf')
     })
@@ -274,7 +274,7 @@ describe('useBook', () => {
     expect(request.format).toBe('pdf')
     expect(request.pages).toHaveLength(1)
     expect(request.pages[0].adjustment).toBeDefined()
-    // The worker gets the stored blob to decode itself, never decoded pixels.
+    // Workerには保存済みblobが渡り、自前でデコードする。デコード済み画素は渡さない。
     expect(await decodeFake(request.pages[0].blob)).toEqual({
       data: Uint8ClampedArray.from([10, 20, 30, 255]),
       width: 1,
