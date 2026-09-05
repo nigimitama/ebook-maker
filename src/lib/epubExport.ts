@@ -27,6 +27,13 @@ function pseudoUuid(): string {
   })
 }
 
+// EPUB 3 requires exactly one dcterms:modified in CCYY-MM-DDThh:mm:ssZ form
+// (no milliseconds); without it epubcheck fails and strict readers such as
+// Apple Books and Kobo reject the file.
+function epubTimestamp(): string {
+  return new Date().toISOString().replace(/\.\d{3}Z$/, 'Z')
+}
+
 function pageXhtml(n: number, width: number, height: number): string {
   return `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml">
@@ -99,6 +106,7 @@ export async function buildEpub(pages: ExportPage[], metadata: BookMetadata): Pr
     <dc:title>${escapeXml(metadata.title)}</dc:title>
     <dc:creator>${escapeXml(metadata.author)}</dc:creator>
     <dc:language>ja</dc:language>
+    <meta property="dcterms:modified">${epubTimestamp()}</meta>
     <meta property="rendition:layout">pre-paginated</meta>
   </metadata>
   <manifest>
