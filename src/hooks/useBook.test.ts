@@ -161,6 +161,27 @@ describe('useBook', () => {
     expect(Array.from(pixels.slice(4, 8))).toEqual([40, 50, 60, 255])
   })
 
+  it('updates the adjustment locally at once and defers the IndexedDB write', async () => {
+    const view = await importPages([imageFile('a.png', [10, 20, 30, 255])])
+    const pageId = view.result.current.pages[0].id
+
+    await act(async () => {
+      // Three ticks of a slider drag: one debounced write, not three.
+      await view.result.current.updateAdjustment(pageId, { brightness: 10, contrast: 0 })
+      await view.result.current.updateAdjustment(pageId, { brightness: 20, contrast: 0 })
+      await view.result.current.updateAdjustment(pageId, { brightness: 30, contrast: 0 })
+    })
+    // Local state is current immediately, with no round-trip.
+    expect(view.result.current.pages[0].adjustment).toEqual({ brightness: 30, contrast: 0 })
+
+    // Exporting before the debounce elapses must still see the latest value.
+    await act(async () => {
+      await view.result.current.exportBook('pdf')
+    })
+    const request = vi.mocked(runExportInWorker).mock.calls[0][0]
+    expect(request.pages[0].adjustment).toEqual({ brightness: 30, contrast: 0 })
+  })
+
   it('sends stored blobs, not decoded pixels, to the export worker', async () => {
     const view = await importPages([imageFile('a.png', [10, 20, 30, 255])])
     await act(async () => {

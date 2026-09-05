@@ -44,11 +44,17 @@ function isQuotaExceeded(error: unknown): boolean {
 // access gives cheap LRU semantics with the oldest entry first.
 const RAW_IMAGE_CACHE_LIMIT = 4
 
+// Quiet period after the last slider tick before the adjustment is written.
+const ADJUSTMENT_WRITE_DEBOUNCE_MS = 250
+
 export function useBook(): UseBookResult {
   const storeRef = useRef<ImageStore | null>(null)
   const storeOpeningRef = useRef<Promise<ImageStore> | null>(null)
   const rawImagesRef = useRef<Map<string, RawImage>>(new Map())
   const selectedPageIdRef = useRef<string | null>(null)
+  const pendingAdjustmentsRef = useRef<
+    Map<string, { timer: ReturnType<typeof setTimeout>; adjustment: AdjustmentParams }>
+  >(new Map())
   const [pages, setPages] = useState<PageEntry[]>([])
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [metadata, setMetadata] = useState<BookMetadata>({ title: '', author: '' })
@@ -57,6 +63,23 @@ export function useBook(): UseBookResult {
   const [error, setError] = useState<string | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
+
+  // Declared before the store-open effect so its cleanup runs first: React
+  // runs effect cleanups in declaration order, and these writes need the
+  // connection still open.
+  useEffect(() => {
+    const pending = pendingAdjustmentsRef.current
+    return () => {
+      const store = storeRef.current
+      for (const [id, entry] of pending) {
+        clearTimeout(entry.timer)
+        // ImageStore.updateAdjustment opens its transaction synchronously, so
+        // it is started before the connection close below is requested.
+        if (store) void store.updateAdjustment(id, entry.adjustment).catch(() => {})
+      }
+      pending.clear()
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -104,11 +127,37 @@ export function useBook(): UseBookResult {
     }
   }, [])
 
+  // Write out any debounced adjustment immediately. Anything that reads pages
+  // back from IndexedDB must do this first, or it would overwrite the
+  // optimistic local state with a stale row.
+  const flushPendingAdjustments = useCallback(async () => {
+    const pending = pendingAdjustmentsRef.current
+    if (pending.size === 0) return
+    const entries = Array.from(pending)
+    pending.clear()
+    const store = storeRef.current
+    for (const [id, entry] of entries) {
+      clearTimeout(entry.timer)
+      // The row can be gone (deleted, or merged into a spread) between the
+      // slider tick and the flush; that write simply has nothing to update.
+      if (store) await store.updateAdjustment(id, entry.adjustment).catch(() => {})
+    }
+  }, [])
+
+  // Drop a debounced write for a page that no longer exists.
+  const cancelPendingAdjustment = useCallback((id: string) => {
+    const entry = pendingAdjustmentsRef.current.get(id)
+    if (!entry) return
+    clearTimeout(entry.timer)
+    pendingAdjustmentsRef.current.delete(id)
+  }, [])
+
   const refreshPages = useCallback(async () => {
     const store = storeRef.current
     if (!store) return
+    await flushPendingAdjustments()
     setPages(await store.listPages())
-  }, [])
+  }, [flushPendingAdjustments])
 
   const setSelected = useCallback((id: string | null) => {
     selectedPageIdRef.current = id
@@ -205,20 +254,31 @@ export function useBook(): UseBookResult {
     [pages, ensureRawImage, setSelected],
   )
 
-  const updateAdjustment = useCallback(
-    async (id: string, adjustment: AdjustmentParams) => {
+  // Every slider tick calls this. Update local state at once so the canvas
+  // redraws with no IndexedDB round-trip in the critical path, and debounce
+  // the write itself — the spec asks for persistence on commit, not on every
+  // input event. The old code wrote and then re-listed the whole page table
+  // per tick, which locks the UI on a real scan.
+  const updateAdjustment = useCallback(async (id: string, adjustment: AdjustmentParams) => {
+    setPages((current) => current.map((p) => (p.id === id ? { ...p, adjustment } : p)))
+    const pending = pendingAdjustmentsRef.current
+    const existing = pending.get(id)
+    if (existing) clearTimeout(existing.timer)
+    const timer = setTimeout(() => {
+      const entry = pending.get(id)
+      pending.delete(id)
       const store = storeRef.current
-      if (!store) return
-      await store.updateAdjustment(id, adjustment)
-      await refreshPages()
-    },
-    [refreshPages],
-  )
+      if (!store || !entry) return
+      void store.updateAdjustment(id, entry.adjustment).catch(() => {})
+    }, ADJUSTMENT_WRITE_DEBOUNCE_MS)
+    pending.set(id, { timer, adjustment })
+  }, [])
 
   const applyAdjustmentToAllPages = useCallback(
     async (sourceId: string) => {
       const store = storeRef.current
       if (!store) return
+      await flushPendingAdjustments()
       const source = pages.find((p) => p.id === sourceId)
       if (!source) return
       for (const page of pages) {
@@ -227,7 +287,7 @@ export function useBook(): UseBookResult {
       }
       await refreshPages()
     },
-    [pages, refreshPages],
+    [pages, refreshPages, flushPendingAdjustments],
   )
 
   const reorderPages = useCallback(
@@ -244,6 +304,7 @@ export function useBook(): UseBookResult {
     async (id: string) => {
       const store = storeRef.current
       if (!store) return
+      cancelPendingAdjustment(id)
       await store.deletePage(id)
       rawImagesRef.current.delete(id)
       setThumbnails((current) => {
@@ -258,7 +319,7 @@ export function useBook(): UseBookResult {
       }
       await refreshPages()
     },
-    [refreshPages, selectedPageId, setSelected],
+    [refreshPages, selectedPageId, setSelected, cancelPendingAdjustment],
   )
 
   const confirmMerge = useCallback(
@@ -282,6 +343,9 @@ export function useBook(): UseBookResult {
         merged.width,
         merged.height,
       )
+      // The source pages are gone now; their debounced writes have no target.
+      cancelPendingAdjustment(firstId)
+      cancelPendingAdjustment(secondId)
       rawImagesRef.current.delete(firstId)
       rawImagesRef.current.delete(secondId)
       cacheRawImage(mergedEntry.id, merged)
@@ -300,13 +364,24 @@ export function useBook(): UseBookResult {
       }
       await refreshPages()
     },
-    [pages, refreshPages, selectedPageId, ensureRawImage, cacheRawImage, setSelected],
+    [
+      pages,
+      refreshPages,
+      selectedPageId,
+      ensureRawImage,
+      cacheRawImage,
+      setSelected,
+      cancelPendingAdjustment,
+    ],
   )
 
   const exportBook = useCallback(
     async (format: 'pdf' | 'epub') => {
       const store = storeRef.current
       if (!store) throw new Error('store not ready')
+      // An export fired straight after a slider drag must not miss the last
+      // adjustment still sitting in the debounce window.
+      await flushPendingAdjustments()
       // Send the stored Blobs, not decoded pixels: the worker decodes each
       // page itself, so nothing here holds a full book's RGBA data at once.
       const currentPages = await store.listPages()
@@ -318,7 +393,7 @@ export function useBook(): UseBookResult {
       }
       return runExportInWorker({ format, metadata, pages: exportPages })
     },
-    [metadata],
+    [metadata, flushPendingAdjustments],
   )
 
   return {
