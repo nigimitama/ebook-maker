@@ -33,14 +33,21 @@ export function App() {
             onDelete={book.deletePage}
             onConfirmMerge={book.confirmMerge}
           />
-          {book.selectedImage && selectedPage && (
-            <AdjustmentEditor
-              image={book.selectedImage}
-              adjustment={selectedPage.adjustment ?? DEFAULT_ADJUSTMENT}
-              onAdjustmentChange={(params) => book.updateAdjustment(selectedPage.id, params)}
-              onApplyToAllPages={() => book.applyAdjustmentToAllPages(selectedPage.id)}
-            />
-          )}
+          {selectedPage &&
+            (book.selectedImage ? (
+              <AdjustmentEditor
+                image={book.selectedImage}
+                adjustment={selectedPage.adjustment ?? DEFAULT_ADJUSTMENT}
+                onAdjustmentChange={(params) => book.updateAdjustment(selectedPage.id, params)}
+                onApplyToAllPages={() => book.applyAdjustmentToAllPages(selectedPage.id)}
+              />
+            ) : (
+              // 画素の準備が整うまでの繋ぎ。ここでエディタごと消すと、ページを
+              // 切り替えるたびにパネルが一瞬消えて壊れて見える。
+              <div className="panel" data-testid="preview-loading">
+                プレビューを準備中...
+              </div>
+            ))}
           <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
           <ExportPanel onExport={book.exportBook} />
         </>

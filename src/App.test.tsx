@@ -72,6 +72,29 @@ describe('App', () => {
     expect(screen.getByTestId('brightness-slider')).toHaveValue('5')
   })
 
+  it('shows a placeholder, not another page’s image, while the preview decodes', () => {
+    const page = {
+      id: 'a',
+      order: 0,
+      blobId: 'blob-a',
+      width: 2,
+      height: 2,
+      adjustment: { brightness: 5, contrast: 0 },
+    }
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({
+        pages: [page],
+        thumbnails: { a: 'blob:a' },
+        selectedPageId: 'a',
+        // 選択は済んでいるが画素がまだ届いていない状態。
+        selectedImage: null,
+      }),
+    )
+    render(<App />)
+    expect(screen.getByTestId('preview-loading')).toBeInTheDocument()
+    expect(screen.queryByTestId('adjustment-canvas')).not.toBeInTheDocument()
+  })
+
   it('shows an error banner when the hook reports an error', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ error: '読み込みに失敗しました: a.heic' }),

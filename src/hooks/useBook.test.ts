@@ -66,8 +66,28 @@ async function downscaleFake(blob: Blob, maxEdge: number) {
 vi.mock('../lib/decodeImage', () => ({
   decodeBlobToRawImage: (blob: Blob) => decodeFake(blob),
 }))
+// 縮小処理を任意のタイミングまで止められるようにしておく。ページ切り替え中の
+// 「デコード待ちの間だけ前のページの画像が残る」競合を決定的に再現するために使う。
+let downscaleGate: { wait: Promise<void>; open: () => void } | null = null
+
+/** 以降の downscale 呼び出しを止める。戻り値を呼ぶと再開する。 */
+function pauseDownscale(): () => void {
+  let open!: () => void
+  const wait = new Promise<void>((resolve) => {
+    open = resolve
+  })
+  downscaleGate = { wait, open }
+  return () => {
+    downscaleGate = null
+    open()
+  }
+}
+
 vi.mock('../lib/downscaleImage', () => ({
-  downscale: (blob: Blob, maxEdge: number) => downscaleFake(blob, maxEdge),
+  downscale: async (blob: Blob, maxEdge: number) => {
+    if (downscaleGate) await downscaleGate.wait
+    return downscaleFake(blob, maxEdge)
+  },
 }))
 vi.mock('../lib/encodeImage', () => ({
   encodeRawImageToPng: async (image: RawImage) => encodeFake(image),
@@ -101,6 +121,9 @@ function deleteDatabase(name: string): Promise<void> {
 
 beforeEach(async () => {
   cleanup()
+  // ゲートを開いたままにしておかないと、閉じたまま次のテストへ漏れて止まる。
+  downscaleGate?.open()
+  downscaleGate = null
   await deleteDatabase('ebook-maker')
   vi.clearAllMocks()
 })
@@ -188,6 +211,37 @@ describe('useBook', () => {
     const pixels = view.result.current.selectedImage!.data
     expect(Array.from(pixels.slice(0, 4))).toEqual([60, 70, 80, 255])
     expect(Array.from(pixels.slice(4, 8))).toEqual([40, 50, 60, 255])
+  })
+
+  it('never pairs the previous page’s pixels with the newly selected page', async () => {
+    const view = await importPages([
+      imageFile('a.png', [10, 20, 30, 255]),
+      imageFile('b.png', [200, 210, 220, 255]),
+    ])
+    const [a, b] = view.result.current.pages
+    await act(async () => {
+      await view.result.current.selectPage(a.id)
+    })
+    expect(Array.from(view.result.current.selectedImage!.data)).toEqual([10, 20, 30, 255])
+
+    // Bへの切り替え中、デコードが終わるまで止める。この間にAの画素が
+    // 残っていると、画面上はAの画像にBの調整値が当たったものが表示される。
+    const resume = pauseDownscale()
+    let switching: Promise<void>
+    await act(async () => {
+      switching = view.result.current.selectPage(b.id)
+      await Promise.resolve()
+    })
+
+    expect(view.result.current.selectedPageId).toBe(b.id)
+    expect(view.result.current.selectedImage).toBeNull()
+
+    await act(async () => {
+      resume()
+      await switching
+    })
+    expect(view.result.current.selectedPageId).toBe(b.id)
+    expect(Array.from(view.result.current.selectedImage!.data)).toEqual([200, 210, 220, 255])
   })
 
   it('updates the adjustment locally at once and defers the IndexedDB write', async () => {

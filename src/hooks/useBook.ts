@@ -39,14 +39,14 @@ function isQuotaExceeded(error: unknown): boolean {
   )
 }
 
-// Decoded RGBA pixels are huge (~15MB for one A4 scan), so at the spec's
-// 200-page scale they cannot all be held at once. Keep only a handful of
-// recently used pages; anything else is re-decoded from its stored Blob on
-// demand. Map iteration order is insertion order, so delete-then-set on
-// access gives cheap LRU semantics with the oldest entry first.
+// デコード済みのRGBA画素は巨大(A4スキャン1枚で約15MB)なので、仕様上の
+// 200ページ規模では全部を同時に保持できない。直近数ページ分だけ残し、
+// それ以外は必要になった時点で保存済みBlobから再デコードする。
+// Mapの反復順は挿入順なので、アクセス時にdelete→setすることで
+// 最古のエントリが先頭に来る簡易LRUになる。
 const RAW_IMAGE_CACHE_LIMIT = 4
 
-// Quiet period after the last slider tick before the adjustment is written.
+// スライダー操作が止まってから調整値を書き込むまでの待機時間。
 const ADJUSTMENT_WRITE_DEBOUNCE_MS = 250
 
 export function useBook(): UseBookResult {
@@ -66,17 +66,17 @@ export function useBook(): UseBookResult {
 
   const clearError = useCallback(() => setError(null), [])
 
-  // Declared before the store-open effect so its cleanup runs first: React
-  // runs effect cleanups in declaration order, and these writes need the
-  // connection still open.
+  // ストアを開くeffectより前に宣言することでクリーンアップを先に走らせる。
+  // Reactはeffectのクリーンアップを宣言順に実行するため、この書き込みは
+  // 接続が開いたままの状態で行える。
   useEffect(() => {
     const pending = pendingAdjustmentsRef.current
     return () => {
       const store = storeRef.current
       for (const [id, entry] of pending) {
         clearTimeout(entry.timer)
-        // ImageStore.updateAdjustment opens its transaction synchronously, so
-        // it is started before the connection close below is requested.
+        // ImageStore.updateAdjustment はトランザクションを同期的に開くので、
+        // 下の接続クローズが要求される前に開始される。
         if (store) void store.updateAdjustment(id, entry.adjustment).catch(() => {})
       }
       pending.clear()
@@ -92,13 +92,13 @@ export function useBook(): UseBookResult {
         if (cancelled) return
         storeRef.current = store
         const loaded = await store.listPages()
-        // Object URLs live only for the lifetime of a document, so after a
-        // reload the pages restored from IndexedDB have no thumbnail unless
-        // we mint one here — otherwise every <img> renders broken.
+        // Object URLはドキュメントの生存期間しか有効でないため、リロード後に
+        // IndexedDBから復元したページはここで作り直さないとサムネイルを持たず、
+        // すべての<img>が壊れた表示になる。
         const restored: Record<string, string> = {}
         for (const page of loaded) {
-          // Pages stored before thumbnails existed have none; build and keep
-          // one now so this load is the only slow one for them.
+          // サムネイル導入前に保存されたページは持っていないので、ここで生成して
+          // 保存する。遅いのはこの初回読み込みだけで済む。
           let thumbBlobId = page.thumbBlobId
           if (!thumbBlobId) {
             const original = await store.getBlob(page.blobId)
@@ -114,9 +114,9 @@ export function useBook(): UseBookResult {
           for (const url of Object.values(restored)) URL.revokeObjectURL(url)
           return
         }
-        // Merge rather than replace: an import can complete while this effect
-        // is still awaiting listPages/getBlob, and replacing would wipe (and
-        // leak) the thumbnail it just created.
+        // 置き換えではなくマージする: このeffectが listPages/getBlob を待っている間に
+        // 取り込みが完了することがあり、置き換えると直前に作られたサムネイルを
+        // 消して(かつリークさせて)しまう。
         setThumbnails((current) => ({ ...restored, ...current }))
         setPages(loaded)
       })
@@ -131,8 +131,8 @@ export function useBook(): UseBookResult {
     }
   }, [])
 
-  // Actions can fire before IndexedDB finishes opening (a user dropping files
-  // onto a freshly loaded page); await the open instead of silently no-oping.
+  // IndexedDBが開き終わる前に操作が発生しうる(読み込み直後のページに
+  // ファイルをドロップした場合など)。黙って何もしないのではなく、開くのを待つ。
   const getStore = useCallback(async (): Promise<ImageStore | null> => {
     if (storeRef.current) return storeRef.current
     try {
@@ -142,9 +142,9 @@ export function useBook(): UseBookResult {
     }
   }, [])
 
-  // Write out any debounced adjustment immediately. Anything that reads pages
-  // back from IndexedDB must do this first, or it would overwrite the
-  // optimistic local state with a stale row.
+  // 遅延中の調整値を即座に書き出す。IndexedDBからページを読み直す処理は
+  // 必ず先にこれを呼ぶこと。さもないと古い行で楽観的更新済みのローカル状態を
+  // 上書きしてしまう。
   const flushPendingAdjustments = useCallback(async () => {
     const pending = pendingAdjustmentsRef.current
     if (pending.size === 0) return
@@ -153,13 +153,13 @@ export function useBook(): UseBookResult {
     const store = storeRef.current
     for (const [id, entry] of entries) {
       clearTimeout(entry.timer)
-      // The row can be gone (deleted, or merged into a spread) between the
-      // slider tick and the flush; that write simply has nothing to update.
+      // スライダー操作からフラッシュまでの間に行が消えている場合がある
+      // (削除、または見開きへの結合)。その場合は更新対象がないだけ。
       if (store) await store.updateAdjustment(id, entry.adjustment).catch(() => {})
     }
   }, [])
 
-  // Drop a debounced write for a page that no longer exists.
+  // 存在しなくなったページに対する遅延書き込みを取り消す。
   const cancelPendingAdjustment = useCallback((id: string) => {
     const entry = pendingAdjustmentsRef.current.get(id)
     if (!entry) return
@@ -179,8 +179,8 @@ export function useBook(): UseBookResult {
     setSelectedPageId(id)
   }, [])
 
-  // Insert (or refresh) an entry as most-recently-used, then evict the
-  // oldest entries that are neither the selected page nor the one just used.
+  // エントリを最新利用として挿入(または更新)し、選択中のページでも
+  // 今使ったページでもない古いエントリから追い出す。
   const cacheRawImage = useCallback((id: string, raw: RawImage) => {
     const cache = rawImagesRef.current
     cache.delete(id)
@@ -216,20 +216,24 @@ export function useBook(): UseBookResult {
     [cacheRawImage],
   )
 
-  // Selects a page and paints it into the editor at preview resolution. The
-  // canvas is only a few hundred px wide, so decoding the original in full
-  // would cost ~65x the pixels actually shown — and every slider tick then
-  // re-runs applyAdjustment over all of them. Merging and exporting still use
-  // the original via ensureRawImage / the worker.
+  // ページを選択し、プレビュー解像度でエディタに描画する。キャンバスの幅は
+  // 数百pxしかないため、原本をフルデコードすると実際に表示する画素の約65倍を
+  // 処理することになり、しかもスライダー操作のたびにその全画素へ
+  // applyAdjustment が走る。見開き結合と書き出しは
+  // ensureRawImage / Worker 経由で引き続き原本を使う。
   const showPreview = useCallback(
     async (id: string, store: ImageStore) => {
       setSelected(id)
+      // 直前のページの画素をここで捨てる。残したままだと、デコードが終わるまでの間
+      // 「前のページの画像」と「新しいページの調整値」が組み合わさって描画される。
+      setSelectedImage(null)
       const pages = await store.listPages()
       const page = pages.find((p) => p.id === id)
       if (!page) return
       const blob = await store.getBlob(page.blobId)
       if (!blob) return
       const preview = await downscale(blob, PREVIEW_MAX_EDGE)
+      // 待っている間にユーザーが別のページへ移っていたら、その選択を上書きしない。
       if (selectedPageIdRef.current !== id) return
       setSelectedImage(preview.image)
     },
@@ -241,16 +245,15 @@ export function useBook(): UseBookResult {
       const store = await getStore()
       if (!store) return
       let firstNewId: string | null = null
-      // One unreadable or unsupported file must not abort the whole import:
-      // skip it, keep going, and report the names afterwards (spec §エラーハンドリング).
+      // 読めない・非対応のファイルが1つあっても取り込み全体を止めない:
+      // そのファイルは飛ばして続行し、後でまとめて名前を報告する(仕様 §エラーハンドリング)。
       const failedNames: string[] = []
       let quotaExceeded = false
       for (const file of files) {
         try {
-          // The original is never decoded at full resolution here. The
-          // thumbnail-sized pixels carry enough of the histogram for auto
-          // adjustment, and `downscale` reports the original dimensions the
-          // exported page needs.
+          // ここで原本をフル解像度でデコードすることはない。自動補正の
+          // ヒストグラムはサムネイル相当の画素で十分で、書き出すページに必要な
+          // 原本の寸法は `downscale` が返してくれる。
           const thumb = await downscale(file, THUMBNAIL_MAX_EDGE)
           const page = await store.addPage(
             file,
@@ -296,11 +299,10 @@ export function useBook(): UseBookResult {
     [showPreview, getStore],
   )
 
-  // Every slider tick calls this. Update local state at once so the canvas
-  // redraws with no IndexedDB round-trip in the critical path, and debounce
-  // the write itself — the spec asks for persistence on commit, not on every
-  // input event. The old code wrote and then re-listed the whole page table
-  // per tick, which locks the UI on a real scan.
+  // スライダー操作のたびに呼ばれる。ローカル状態は即時更新してキャンバスの
+  // 再描画からIndexedDBの往復を外し、書き込み自体は遅延させる。仕様も
+  // 入力イベントごとではなく確定時の保存を求めている。以前は1目盛ごとに
+  // 書き込んでページ表全体を読み直しており、実物のスキャンではUIが固まっていた。
   const updateAdjustment = useCallback(async (id: string, adjustment: AdjustmentParams) => {
     setPages((current) => current.map((p) => (p.id === id ? { ...p, adjustment } : p)))
     const pending = pendingAdjustmentsRef.current
@@ -371,10 +373,10 @@ export function useBook(): UseBookResult {
       const first = pages.find((p) => p.id === firstId)
       const second = pages.find((p) => p.id === secondId)
       if (!first || !second) return
-      // Bake each source page's own brightness/contrast into the merged
-      // pixels — the originals are deleted by the merge, so an unadjusted
-      // merge would silently discard whatever the user had dialled in. The
-      // merged entry's own adjustment then correctly starts at 0/0.
+      // 各ページ自身の明るさ/コントラストを結合後の画素に焼き込む。
+      // 結合時に元ページは削除されるため、無調整のまま結合すると
+      // ユーザーが設定した値を黙って捨てることになる。焼き込んだ上で
+      // 結合後エントリの調整値は0/0から始めるのが正しい。
       const rawFirst = applyAdjustment(await ensureRawImage(first), first.adjustment)
       const rawSecond = applyAdjustment(await ensureRawImage(second), second.adjustment)
       const merged = mergeSpread(rawFirst, rawSecond)
@@ -388,7 +390,7 @@ export function useBook(): UseBookResult {
         merged.height,
         mergedThumbBlob,
       )
-      // The source pages are gone now; their debounced writes have no target.
+      // 元ページは削除済みなので、遅延中の書き込みは対象を失っている。
       cancelPendingAdjustment(firstId)
       cancelPendingAdjustment(secondId)
       rawImagesRef.current.delete(firstId)
@@ -424,11 +426,11 @@ export function useBook(): UseBookResult {
     async (format: 'pdf' | 'epub') => {
       const store = storeRef.current
       if (!store) throw new Error('store not ready')
-      // An export fired straight after a slider drag must not miss the last
-      // adjustment still sitting in the debounce window.
+      // スライダー操作直後の書き出しで、遅延待ちのままの最後の調整値を
+      // 取りこぼさないようにする。
       await flushPendingAdjustments()
-      // Send the stored Blobs, not decoded pixels: the worker decodes each
-      // page itself, so nothing here holds a full book's RGBA data at once.
+      // デコード済み画素ではなく保存済みBlobを送る: Worker側が各ページを
+      // 自前でデコードするので、ここで1冊分のRGBAを同時に抱えずに済む。
       const currentPages = await store.listPages()
       const exportPages: ExportRequestPage[] = []
       for (const page of currentPages) {
