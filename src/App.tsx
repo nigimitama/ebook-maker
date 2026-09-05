@@ -13,6 +13,14 @@ export function App() {
   return (
     <div>
       <h1>ebook-maker</h1>
+      {book.error && (
+        <div role="alert" data-testid="error-banner">
+          <span>{book.error}</span>
+          <button type="button" onClick={book.clearError}>
+            閉じる
+          </button>
+        </div>
+      )}
       <ImportPanel onImport={book.importFiles} />
       {book.pages.length > 0 && (
         <>

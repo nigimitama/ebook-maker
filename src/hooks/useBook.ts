@@ -23,6 +23,17 @@ export interface UseBookResult {
   confirmMerge: (firstId: string, secondId: string) => Promise<void>
   setMetadata: (metadata: BookMetadata) => void
   exportBook: (format: 'pdf' | 'epub') => Promise<Blob>
+  error: string | null
+  clearError: () => void
+}
+
+function isQuotaExceeded(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    (error as { name: unknown }).name === 'QuotaExceededError'
+  )
 }
 
 // Decoded RGBA pixels are huge (~15MB for one A4 scan), so at the spec's
@@ -41,17 +52,26 @@ export function useBook(): UseBookResult {
   const [metadata, setMetadata] = useState<BookMetadata>({ title: '', author: '' })
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<RawImage | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const clearError = useCallback(() => setError(null), [])
 
   useEffect(() => {
     let cancelled = false
-    ImageStore.open().then((store) => {
-      if (cancelled) {
-        store.close()
-        return
-      }
-      storeRef.current = store
-      store.listPages().then(setPages)
-    })
+    ImageStore.open()
+      .then(async (store) => {
+        if (cancelled) {
+          store.close()
+          return
+        }
+        storeRef.current = store
+        setPages(await store.listPages())
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setError('このブラウザは対応していません(IndexedDBが利用できません)')
+        }
+      })
     return () => {
       cancelled = true
       storeRef.current?.close()
@@ -113,13 +133,31 @@ export function useBook(): UseBookResult {
       // Decoded pixels are deliberately NOT cached for every imported file —
       // only the first page, which is about to be shown in the editor.
       let firstNew: { id: string; raw: RawImage } | null = null
+      // One unreadable or unsupported file must not abort the whole import:
+      // skip it, keep going, and report the names afterwards (spec §エラーハンドリング).
+      const failedNames: string[] = []
+      let quotaExceeded = false
       for (const file of files) {
-        const raw = await decodeBlobToRawImage(file)
-        const page = await store.addPage(file, raw.width, raw.height)
-        const auto = computeAutoAdjustment(raw)
-        await store.updateAdjustment(page.id, auto)
-        setThumbnails((current) => ({ ...current, [page.id]: URL.createObjectURL(file) }))
-        if (!firstNew) firstNew = { id: page.id, raw }
+        try {
+          const raw = await decodeBlobToRawImage(file)
+          const page = await store.addPage(file, raw.width, raw.height)
+          const auto = computeAutoAdjustment(raw)
+          await store.updateAdjustment(page.id, auto)
+          setThumbnails((current) => ({ ...current, [page.id]: URL.createObjectURL(file) }))
+          if (!firstNew) firstNew = { id: page.id, raw }
+        } catch (fileError) {
+          if (isQuotaExceeded(fileError)) quotaExceeded = true
+          failedNames.push(file.name)
+        }
+      }
+      if (failedNames.length > 0) {
+        setError(
+          quotaExceeded
+            ? `保存容量が不足しています。不要なページを削除してください: ${failedNames.join(', ')}`
+            : `読み込みに失敗しました: ${failedNames.join(', ')}`,
+        )
+      } else {
+        setError(null)
       }
       await refreshPages()
       if (firstNew && !selectedPageId) {
@@ -268,5 +306,7 @@ export function useBook(): UseBookResult {
     confirmMerge,
     setMetadata,
     exportBook,
+    error,
+    clearError,
   }
 }
