@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ImageStore } from './imageStore'
+import { Blob as NodeBlob } from 'node:buffer'
 
 function blob(byte: number): Blob {
-  return new Blob([new Uint8Array([byte])], { type: 'image/png' })
+  return new NodeBlob([new Uint8Array([byte])], { type: 'image/png' }) as unknown as Blob
 }
 
 describe('ImageStore', () => {
