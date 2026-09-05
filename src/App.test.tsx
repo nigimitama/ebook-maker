@@ -20,6 +20,8 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     confirmMerge: vi.fn(),
     setMetadata: vi.fn(),
     exportBook: vi.fn(),
+    error: null,
+    clearError: vi.fn(),
     ...overrides,
   }
 }
@@ -68,5 +70,14 @@ describe('App', () => {
     )
     render(<App />)
     expect(screen.getByTestId('brightness-slider')).toHaveValue('5')
+  })
+
+  it('shows an error banner when the hook reports an error', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ error: '読み込みに失敗しました: a.heic' }),
+    )
+    render(<App />)
+    expect(screen.getByTestId('error-banner')).toHaveTextContent('読み込みに失敗しました: a.heic')
+    expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 })
