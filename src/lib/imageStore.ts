@@ -58,22 +58,43 @@ export class ImageStore {
     this.db.close()
   }
 
-  async addPage(blob: Blob, width: number, height: number): Promise<PageEntry> {
+  async addPage(
+    blob: Blob,
+    width: number,
+    height: number,
+    thumbBlob?: Blob,
+  ): Promise<PageEntry> {
     const pages = await this.listPages()
     const maxOrder = pages.reduce((max, p) => Math.max(max, p.order), -1)
     const page: PageEntry = {
       id: nextId(),
       order: maxOrder + 1,
       blobId: nextId(),
+      ...(thumbBlob ? { thumbBlobId: nextId() } : {}),
       width,
       height,
       adjustment: { ...DEFAULT_ADJUSTMENT },
     }
     const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
-    tx.objectStore(BLOB_STORE).put(blob, page.blobId)
+    const blobStore = tx.objectStore(BLOB_STORE)
+    blobStore.put(blob, page.blobId)
+    if (thumbBlob && page.thumbBlobId) blobStore.put(thumbBlob, page.thumbBlobId)
     tx.objectStore(PAGE_STORE).put(page)
     await txDone(tx)
     return page
+  }
+
+  /** Attaches a thumbnail to a page stored before thumbnails existed. */
+  async setThumbnail(id: string, thumbBlob: Blob): Promise<string> {
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
+    const pageStore = tx.objectStore(PAGE_STORE)
+    const page = (await reqToPromise(pageStore.get(id))) as PageEntry | undefined
+    if (!page) throw new Error(`page not found: ${id}`)
+    const thumbBlobId = page.thumbBlobId ?? nextId()
+    tx.objectStore(BLOB_STORE).put(thumbBlob, thumbBlobId)
+    pageStore.put({ ...page, thumbBlobId })
+    await txDone(tx)
+    return thumbBlobId
   }
 
   async listPages(): Promise<PageEntry[]> {
@@ -113,7 +134,9 @@ export class ImageStore {
     const page = (await reqToPromise(pageStore.get(id))) as PageEntry | undefined
     if (!page) throw new Error(`page not found: ${id}`)
     pageStore.delete(id)
-    tx.objectStore(BLOB_STORE).delete(page.blobId)
+    const blobStore = tx.objectStore(BLOB_STORE)
+    blobStore.delete(page.blobId)
+    if (page.thumbBlobId) blobStore.delete(page.thumbBlobId)
     await txDone(tx)
   }
 
@@ -122,6 +145,7 @@ export class ImageStore {
     blob: Blob,
     width: number,
     height: number,
+    thumbBlob?: Blob,
   ): Promise<PageEntry> {
     const pages = await this.listPages()
     const [firstId] = removeIds
@@ -132,6 +156,7 @@ export class ImageStore {
       id: nextId(),
       order: pages[firstIndex].order,
       blobId: nextId(),
+      ...(thumbBlob ? { thumbBlobId: nextId() } : {}),
       width,
       height,
       adjustment: { ...DEFAULT_ADJUSTMENT },
@@ -147,8 +172,10 @@ export class ImageStore {
       if (!p) throw new Error(`page not found: ${id}`)
       pageStore.delete(id)
       blobStore.delete(p.blobId)
+      if (p.thumbBlobId) blobStore.delete(p.thumbBlobId)
     }
     blobStore.put(blob, merged.blobId)
+    if (thumbBlob && merged.thumbBlobId) blobStore.put(thumbBlob, merged.thumbBlobId)
     remaining.forEach((p, i) => pageStore.put({ ...p, order: i }))
     await txDone(tx)
     return merged

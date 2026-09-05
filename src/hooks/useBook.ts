@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImageStore } from '../lib/imageStore'
 import { decodeBlobToRawImage } from '../lib/decodeImage'
+import { downscale } from '../lib/downscaleImage'
+import { PREVIEW_MAX_EDGE, THUMBNAIL_MAX_EDGE } from '../lib/previewSizes'
 import { encodeRawImageToPng } from '../lib/encodeImage'
 import { computeAutoAdjustment } from '../lib/autoAdjust'
 import { applyAdjustment } from '../lib/applyAdjustment'
@@ -95,7 +97,17 @@ export function useBook(): UseBookResult {
         // we mint one here — otherwise every <img> renders broken.
         const restored: Record<string, string> = {}
         for (const page of loaded) {
-          const blob = await store.getBlob(page.blobId)
+          // Pages stored before thumbnails existed have none; build and keep
+          // one now so this load is the only slow one for them.
+          let thumbBlobId = page.thumbBlobId
+          if (!thumbBlobId) {
+            const original = await store.getBlob(page.blobId)
+            if (!original) continue
+            const thumb = await downscale(original, THUMBNAIL_MAX_EDGE)
+            thumbBlobId = await store.setThumbnail(page.id, await thumb.toBlob())
+            page.thumbBlobId = thumbBlobId
+          }
+          const blob = await store.getBlob(thumbBlobId)
           if (blob) restored[page.id] = URL.createObjectURL(blob)
         }
         if (cancelled) {
@@ -204,25 +216,55 @@ export function useBook(): UseBookResult {
     [cacheRawImage],
   )
 
+  // Selects a page and paints it into the editor at preview resolution. The
+  // canvas is only a few hundred px wide, so decoding the original in full
+  // would cost ~65x the pixels actually shown — and every slider tick then
+  // re-runs applyAdjustment over all of them. Merging and exporting still use
+  // the original via ensureRawImage / the worker.
+  const showPreview = useCallback(
+    async (id: string, store: ImageStore) => {
+      setSelected(id)
+      const pages = await store.listPages()
+      const page = pages.find((p) => p.id === id)
+      if (!page) return
+      const blob = await store.getBlob(page.blobId)
+      if (!blob) return
+      const preview = await downscale(blob, PREVIEW_MAX_EDGE)
+      if (selectedPageIdRef.current !== id) return
+      setSelectedImage(preview.image)
+    },
+    [setSelected],
+  )
+
   const importFiles = useCallback(
     async (files: File[]) => {
       const store = await getStore()
       if (!store) return
-      // Decoded pixels are deliberately NOT cached for every imported file —
-      // only the first page, which is about to be shown in the editor.
-      let firstNew: { id: string; raw: RawImage } | null = null
+      let firstNewId: string | null = null
       // One unreadable or unsupported file must not abort the whole import:
       // skip it, keep going, and report the names afterwards (spec §エラーハンドリング).
       const failedNames: string[] = []
       let quotaExceeded = false
       for (const file of files) {
         try {
-          const raw = await decodeBlobToRawImage(file)
-          const page = await store.addPage(file, raw.width, raw.height)
-          const auto = computeAutoAdjustment(raw)
+          // The original is never decoded at full resolution here. The
+          // thumbnail-sized pixels carry enough of the histogram for auto
+          // adjustment, and `downscale` reports the original dimensions the
+          // exported page needs.
+          const thumb = await downscale(file, THUMBNAIL_MAX_EDGE)
+          const page = await store.addPage(
+            file,
+            thumb.originalWidth,
+            thumb.originalHeight,
+            await thumb.toBlob(),
+          )
+          const auto = computeAutoAdjustment(thumb.image)
           await store.updateAdjustment(page.id, auto)
-          setThumbnails((current) => ({ ...current, [page.id]: URL.createObjectURL(file) }))
-          if (!firstNew) firstNew = { id: page.id, raw }
+          const thumbBlob = page.thumbBlobId ? await store.getBlob(page.thumbBlobId) : undefined
+          if (thumbBlob) {
+            setThumbnails((current) => ({ ...current, [page.id]: URL.createObjectURL(thumbBlob) }))
+          }
+          if (!firstNewId) firstNewId = page.id
         } catch (fileError) {
           if (isQuotaExceeded(fileError)) quotaExceeded = true
           failedNames.push(file.name)
@@ -238,23 +280,20 @@ export function useBook(): UseBookResult {
         setError(null)
       }
       await refreshPages()
-      if (firstNew && !selectedPageId) {
-        setSelected(firstNew.id)
-        cacheRawImage(firstNew.id, firstNew.raw)
-        setSelectedImage(firstNew.raw)
+      if (firstNewId && !selectedPageId) {
+        await showPreview(firstNewId, store)
       }
     },
-    [refreshPages, selectedPageId, setSelected, cacheRawImage, getStore],
+    [refreshPages, selectedPageId, showPreview, getStore],
   )
 
   const selectPage = useCallback(
     async (id: string) => {
-      const page = pages.find((p) => p.id === id)
-      if (!page) return
-      setSelected(id)
-      setSelectedImage(await ensureRawImage(page))
+      const store = await getStore()
+      if (!store) return
+      await showPreview(id, store)
     },
-    [pages, ensureRawImage, setSelected],
+    [showPreview, getStore],
   )
 
   // Every slider tick calls this. Update local state at once so the canvas
@@ -340,11 +379,14 @@ export function useBook(): UseBookResult {
       const rawSecond = applyAdjustment(await ensureRawImage(second), second.adjustment)
       const merged = mergeSpread(rawFirst, rawSecond)
       const blob = await encodeRawImageToPng(merged)
+      const mergedThumb = await downscale(blob, THUMBNAIL_MAX_EDGE)
+      const mergedThumbBlob = await mergedThumb.toBlob()
       const mergedEntry = await store.replacePagesWithMerged(
         [firstId, secondId],
         blob,
         merged.width,
         merged.height,
+        mergedThumbBlob,
       )
       // The source pages are gone now; their debounced writes have no target.
       cancelPendingAdjustment(firstId)
@@ -358,12 +400,12 @@ export function useBook(): UseBookResult {
         if (next[secondId]) URL.revokeObjectURL(next[secondId])
         delete next[firstId]
         delete next[secondId]
-        next[mergedEntry.id] = URL.createObjectURL(blob)
+        next[mergedEntry.id] = URL.createObjectURL(mergedThumbBlob)
         return next
       })
       if (selectedPageId === firstId || selectedPageId === secondId) {
         setSelected(mergedEntry.id)
-        setSelectedImage(merged)
+        setSelectedImage((await downscale(blob, PREVIEW_MAX_EDGE)).image)
       }
       await refreshPages()
     },
