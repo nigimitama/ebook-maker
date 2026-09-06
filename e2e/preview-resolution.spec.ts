@@ -28,7 +28,6 @@ test('previews are downscaled, not full-resolution originals', async ({ page }) 
 
   // 並べ替え工程のサムネイル(page-list__thumb)がダウンスケールされていることを確認する。
   await page.getByText('次へ', { exact: true }).click()
-  await page.getByText('並べ替えへ進む').click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
 
   await page.waitForFunction(() => {
@@ -44,9 +43,11 @@ test('previews are downscaled, not full-resolution originals', async ({ page }) 
   // アスペクト比が保たれている(縦長は縦長のまま)。
   expect(thumb.height).toBeGreaterThan(thumb.width)
 
-  // 一覧でページを選び直してから調整工程へ戻ると、選び直した方が編集対象になる。
+  // 一覧でページを選び直してから調整工程へ進むと、選び直した方が編集対象になる。
+  // サムネイルのクリックは拡大モーダルも開くので、続行前に閉じる。
   await page.locator('.page-list__thumb').first().click()
-  await page.getByText('戻る').click()
+  await page.keyboard.press('Escape')
+  await page.getByText('調整へ進む').click()
   await expect(page.getByTestId('adjustment-canvas')).toBeVisible()
   await page.waitForFunction(() => {
     const canvas = document.querySelector(
@@ -71,8 +72,8 @@ test('export keeps the original resolution despite downscaled previews', async (
   await page.setInputFiles('[data-testid="file-input"]', [writeScan('scan.png')])
 
   await page.getByText('次へ', { exact: true }).click()
-  await page.getByText('並べ替えへ進む').click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
+  await page.getByText('調整へ進む').click()
   await page.getByText('詳細情報へ進む').click()
 
   await page.getByRole('button', { name: '書き出し' }).click()

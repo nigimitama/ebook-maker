@@ -63,6 +63,7 @@ export class ImageStore {
     width: number,
     height: number,
     thumbBlob?: Blob,
+    fileName?: string,
   ): Promise<PageEntry> {
     const pages = await this.listPages()
     const maxOrder = pages.reduce((max, p) => Math.max(max, p.order), -1)
@@ -71,6 +72,7 @@ export class ImageStore {
       order: maxOrder + 1,
       blobId: nextId(),
       ...(thumbBlob ? { thumbBlobId: nextId() } : {}),
+      ...(fileName ? { fileName } : {}),
       width,
       height,
       adjustment: { ...DEFAULT_ADJUSTMENT },

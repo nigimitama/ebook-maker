@@ -51,7 +51,6 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
-    fireEvent.click(screen.getByText('並べ替えへ進む'))
     expect(screen.getByText('見開き結合')).toBeInTheDocument()
   })
 
@@ -61,7 +60,7 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
-    fireEvent.click(screen.getByText('並べ替えへ進む'))
+    fireEvent.click(screen.getByText('調整へ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
   })
@@ -77,6 +76,7 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('調整へ進む'))
     expect(screen.getByTestId('brightness-slider')).toHaveValue('5')
   })
 
@@ -92,6 +92,7 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('調整へ進む'))
     expect(screen.getByTestId('preview-loading')).toBeInTheDocument()
     expect(screen.queryByTestId('adjustment-canvas')).not.toBeInTheDocument()
   })

@@ -340,36 +340,112 @@ label {
   border: 2px solid var(--color-accent);
 }
 
+/* — 並べ替え工程: 1ファイル1行の縦積みリスト。カード+影ではなく、
+   台帳のように罫線で区切って一覧性を優先する。 — */
 .page-list__items {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
+  flex-direction: column;
   list-style: none;
   padding: 0;
   margin: 0;
+  border-top: 1px solid var(--color-divider);
 }
 
-.page-list__item {
+.page-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  gap: 6px;
-  width: 140px;
-  padding: 8px;
+  gap: 14px;
+  padding: 10px 6px;
+  border-bottom: 1px solid var(--color-divider);
+  border-left: 3px solid transparent;
+}
+
+.page-row--selected {
+  border-left-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.page-row--pending-delete {
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+.page-row__thumb-btn {
+  flex: none;
+  padding: 0;
   border: 1px solid var(--color-divider);
   background: var(--color-surface);
+  cursor: zoom-in;
 }
 
-.page-list__item--selected {
-  outline: 2px solid var(--color-accent);
+.page-row__thumb-btn:hover {
+  border-color: var(--color-accent);
 }
 
 .page-list__thumb {
-  width: 100%;
-  height: 140px;
-  object-fit: contain;
-  cursor: pointer;
+  width: 64px;
+  height: 84px;
+  object-fit: cover;
   background: var(--color-bg);
+}
+
+.page-row__name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+}
+
+.page-row__actions {
+  flex: none;
+  display: flex;
+  gap: 8px;
+}
+
+.page-row__merge--active {
+  color: var(--color-bg);
+  background: var(--color-accent);
+}
+
+.page-row__removed-label {
+  flex: 1;
+}
+
+.thumb-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, black 70%, transparent);
+  z-index: 20;
+}
+
+.thumb-modal__frame {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: min(90vw, 720px);
+  max-height: 90vh;
+  padding: 16px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+}
+
+.thumb-modal__frame img {
+  max-width: 100%;
+  max-height: 75vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  margin: 0 auto;
+}
+
+.thumb-modal__close {
+  align-self: flex-end;
 }
 
 .merge-preview {
