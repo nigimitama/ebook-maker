@@ -104,19 +104,6 @@ describe('App', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
-  it('resets to the import step when the last page is removed', () => {
-    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
-      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
-    )
-    const { rerender } = render(<App />)
-    fireEvent.click(screen.getByText('次へ'))
-    expect(screen.queryByText('ファイルを選択')).not.toBeInTheDocument()
-
-    vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook({ pages: [] }))
-    rerender(<App />)
-    expect(screen.getByText('ファイルを選択')).toBeInTheDocument()
-  })
-
   it('does not allow jumping to a step ahead of the furthest one reached via the rail', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),

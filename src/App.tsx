@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useBook } from './hooks/useBook'
 import { ImportPanel } from './components/ImportPanel'
 import { PageList } from './components/PageList'
@@ -40,15 +40,6 @@ export function App() {
   const selectedPage = book.pages.find((p) => p.id === book.selectedPageId)
   const [step, setStep] = useState(0)
   const [maxStep, setMaxStep] = useState(0)
-
-  // ページが1枚もなくなったら(全削除など)取り込み画面まで戻す。
-  // 以降の工程はページの存在を前提にしているため、空のまま残すと壊れて見える。
-  useEffect(() => {
-    if (book.pages.length === 0 && step !== 0) {
-      setStep(0)
-      setMaxStep(0)
-    }
-  }, [book.pages.length, step])
 
   function goTo(next: number) {
     setStep(next)
