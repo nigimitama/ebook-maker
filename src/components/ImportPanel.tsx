@@ -2,6 +2,7 @@ import { useRef } from 'react'
 
 interface ImportPanelProps {
   onImport: (files: File[]) => void
+  pageCount?: number
 }
 
 function filterImageFiles(fileList: FileList | null): File[] {
@@ -9,7 +10,7 @@ function filterImageFiles(fileList: FileList | null): File[] {
   return Array.from(fileList).filter((file) => file.type.startsWith('image/'))
 }
 
-export function ImportPanel({ onImport }: ImportPanelProps) {
+export function ImportPanel({ onImport, pageCount = 0 }: ImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -29,6 +30,11 @@ export function ImportPanel({ onImport }: ImportPanelProps) {
       }}
     >
       <p>画像をドラッグ&ドロップ、またはファイル/フォルダを選択</p>
+      {pageCount > 0 && (
+        <p className="import-count" data-testid="import-count">
+          {pageCount}件登録済み
+        </p>
+      )}
       <button type="button" onClick={() => fileInputRef.current?.click()}>
         ファイルを選択
       </button>

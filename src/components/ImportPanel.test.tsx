@@ -43,4 +43,14 @@ describe('ImportPanel', () => {
     fireEvent.change(input, { target: { files: [new File(['x'], 'a.txt', { type: 'text/plain' })] } })
     expect(onImport).not.toHaveBeenCalled()
   })
+
+  it('does not show a registered-count message when no files are registered', () => {
+    render(<ImportPanel onImport={vi.fn()} />)
+    expect(screen.queryByTestId('import-count')).not.toBeInTheDocument()
+  })
+
+  it('shows the registered-count message when files are already registered', () => {
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} />)
+    expect(screen.getByTestId('import-count')).toHaveTextContent('3件登録済み')
+  })
 })
