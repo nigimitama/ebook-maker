@@ -43,4 +43,35 @@ describe('ImportPanel', () => {
     fireEvent.change(input, { target: { files: [new File(['x'], 'a.txt', { type: 'text/plain' })] } })
     expect(onImport).not.toHaveBeenCalled()
   })
+
+  it('does not show a registered-count message when no files are registered', () => {
+    render(<ImportPanel onImport={vi.fn()} />)
+    expect(screen.queryByTestId('import-count')).not.toBeInTheDocument()
+  })
+
+  it('shows the registered-count message when files are already registered', () => {
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} />)
+    expect(screen.getByTestId('import-count')).toHaveTextContent('3件登録済み')
+  })
+
+  it('does not show a clear-all button when onClearAll is not provided', () => {
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} />)
+    expect(screen.queryByTestId('clear-all-button')).not.toBeInTheDocument()
+  })
+
+  it('calls onClearAll after confirmation when the clear-all button is clicked', () => {
+    const onClearAll = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} onClearAll={onClearAll} />)
+    fireEvent.click(screen.getByTestId('clear-all-button'))
+    expect(onClearAll).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not call onClearAll when the confirmation is dismissed', () => {
+    const onClearAll = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} onClearAll={onClearAll} />)
+    fireEvent.click(screen.getByTestId('clear-all-button'))
+    expect(onClearAll).not.toHaveBeenCalled()
+  })
 })

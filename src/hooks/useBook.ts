@@ -23,6 +23,7 @@ export interface UseBookResult {
   applyAdjustmentToAllPages: (sourceId: string) => Promise<void>
   reorderPages: (orderedIds: string[]) => Promise<void>
   deletePage: (id: string) => Promise<void>
+  clearAllPages: () => Promise<void>
   confirmMerge: (firstId: string, secondId: string) => Promise<void>
   setMetadata: (metadata: BookMetadata) => void
   exportBook: (format: 'pdf' | 'epub') => Promise<Blob>
@@ -366,6 +367,22 @@ export function useBook(): UseBookResult {
     [refreshPages, selectedPageId, setSelected, cancelPendingAdjustment],
   )
 
+  const clearAllPages = useCallback(async () => {
+    const store = storeRef.current
+    if (!store) return
+    for (const entry of pendingAdjustmentsRef.current.values()) clearTimeout(entry.timer)
+    pendingAdjustmentsRef.current.clear()
+    rawImagesRef.current.clear()
+    await store.clearAll()
+    setThumbnails((current) => {
+      for (const url of Object.values(current)) URL.revokeObjectURL(url)
+      return {}
+    })
+    setSelected(null)
+    setSelectedImage(null)
+    await refreshPages()
+  }, [refreshPages, setSelected])
+
   const confirmMerge = useCallback(
     async (firstId: string, secondId: string) => {
       const store = storeRef.current
@@ -455,6 +472,7 @@ export function useBook(): UseBookResult {
     applyAdjustmentToAllPages,
     reorderPages,
     deletePage,
+    clearAllPages,
     confirmMerge,
     setMetadata,
     exportBook,

@@ -88,7 +88,11 @@ export function App() {
         <div className="step-content">
           {step === 0 && (
             <>
-              <ImportPanel onImport={book.importFiles} />
+              <ImportPanel
+                onImport={book.importFiles}
+                pageCount={book.pages.length}
+                onClearAll={book.clearAllPages}
+              />
               <div className="nav-actions nav-actions--end">
                 <button
                   type="button"

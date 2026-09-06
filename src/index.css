@@ -308,6 +308,16 @@ label {
   margin: 0 4px;
 }
 
+.import-count {
+  font-weight: bold;
+  color: var(--color-text);
+}
+
+.import-count__clear {
+  margin-left: 8px;
+  font-weight: normal;
+}
+
 /* — 調整工程の簡易フィルムストリップ(どのページを編集するかの選択だけを担う。
    並べ替え・削除・結合は並べ替え工程の PageList が担当する) — */
 .filmstrip {
