@@ -18,6 +18,7 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     reorderPages: vi.fn(),
     deletePage: vi.fn(),
     confirmMerge: vi.fn(),
+    clearAllPages: vi.fn(),
     setMetadata: vi.fn(),
     exportBook: vi.fn(),
     error: null,
