@@ -128,4 +128,32 @@ describe('PageList', () => {
     fireEvent.click(screen.getByText('結合を確定'))
     expect(props.onConfirmMerge).toHaveBeenCalledWith('b', 'c')
   })
+
+  it('defaults to file-name ascending order, shown in the sort status', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(昇順)')
+    // 与えられたページは既にファイル名昇順なので、初期化のための並べ替えは走らない。
+    expect(props.onReorder).not.toHaveBeenCalled()
+  })
+
+  it('sorts by file name ascending/descending when the buttons are clicked', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    fireEvent.click(screen.getByText('ファイル名降順'))
+    expect(props.onReorder).toHaveBeenCalledWith(['c', 'b', 'a'])
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(降順)')
+    fireEvent.click(screen.getByText('ファイル名昇順'))
+    expect(props.onReorder).toHaveBeenCalledWith(['a', 'b', 'c'])
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(昇順)')
+  })
+
+  it('marks the sort status as manual after a drag-and-drop reorder', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    fireEvent.dragStart(screen.getByTestId('page-item-a'))
+    fireEvent.dragOver(screen.getByTestId('page-item-c'))
+    fireEvent.drop(screen.getByTestId('page-item-c'))
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('手動')
+  })
 })

@@ -15,6 +15,22 @@ interface PageListProps {
 // 「元に戻す」で取り消せる。
 const DELETE_UNDO_MS = 5000
 
+type SortMode = 'name-asc' | 'name-desc' | 'custom'
+
+function displayNameOf(page: PageEntry): string {
+  return page.fileName ?? `ページ ${page.order + 1}`
+}
+
+function sortIdsByName(pages: PageEntry[], direction: 'asc' | 'desc'): string[] {
+  const sorted = [...pages].sort((a, b) => displayNameOf(a).localeCompare(displayNameOf(b)))
+  if (direction === 'desc') sorted.reverse()
+  return sorted.map((p) => p.id)
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index])
+}
+
 export function PageList({
   pages,
   thumbnails,
@@ -25,6 +41,8 @@ export function PageList({
   onConfirmMerge,
 }: PageListProps) {
   const draggedId = useRef<string | null>(null)
+  const [sortMode, setSortMode] = useState<SortMode>('name-asc')
+  const didInitialSort = useRef(false)
   const [mergeSelection, setMergeSelection] = useState<string[]>([])
   const [previewPageId, setPreviewPageId] = useState<string | null>(null)
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([])
@@ -49,6 +67,25 @@ export function PageList({
     }
   }, [])
 
+  // ページ一覧を開いた最初の時点で、ファイル名昇順になっていなければ
+  // 一度だけ並べ替えて確定する。デフォルトの並び順として仕様が求めるため。
+  useEffect(() => {
+    if (didInitialSort.current || pages.length === 0) return
+    didInitialSort.current = true
+    const nameAsc = sortIdsByName(pages, 'asc')
+    if (!arraysEqual(
+      nameAsc,
+      pages.map((p) => p.id),
+    )) {
+      onReorder(nameAsc)
+    }
+  }, [pages, onReorder])
+
+  function sortByName(direction: 'asc' | 'desc') {
+    setSortMode(direction === 'asc' ? 'name-asc' : 'name-desc')
+    onReorder(sortIdsByName(pages, direction))
+  }
+
   function handleDrop(targetId: string) {
     const sourceId = draggedId.current
     draggedId.current = null
@@ -60,6 +97,7 @@ export function PageList({
     const targetIndexInFiltered = withoutSource.indexOf(targetId)
     const insertAt = sourceIndex < targetIndex ? targetIndexInFiltered + 1 : targetIndexInFiltered
     withoutSource.splice(insertAt, 0, sourceId)
+    setSortMode('custom')
     onReorder(withoutSource)
   }
 
@@ -111,6 +149,31 @@ export function PageList({
 
   return (
     <div className="panel">
+      <div className="page-list__sort" data-testid="sort-controls">
+        <span className="page-list__sort-label" data-testid="sort-status">
+          並び順:{' '}
+          {sortMode === 'name-asc'
+            ? 'ファイル名(昇順)'
+            : sortMode === 'name-desc'
+              ? 'ファイル名(降順)'
+              : '手動'}
+        </span>
+        <button
+          type="button"
+          className={sortMode === 'name-asc' ? 'btn-ghost page-row__merge--active' : 'btn-ghost'}
+          onClick={() => sortByName('asc')}
+        >
+          ファイル名昇順
+        </button>
+        <button
+          type="button"
+          className={sortMode === 'name-desc' ? 'btn-ghost page-row__merge--active' : 'btn-ghost'}
+          onClick={() => sortByName('desc')}
+        >
+          ファイル名降順
+        </button>
+      </div>
+
       {mergeSelection.length === 2 && (
         <div data-testid="merge-preview" className="merge-preview">
           <img src={thumbnails[mergeSelection[0]]} alt="left page" />
