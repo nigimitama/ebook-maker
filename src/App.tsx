@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useBook } from './hooks/useBook'
 import { ImportPanel } from './components/ImportPanel'
 import { PageList } from './components/PageList'
@@ -45,6 +45,14 @@ export function App() {
     setStep(next)
     setMaxStep((current) => Math.max(current, next))
   }
+
+  // 「調整」工程に入ったとき、まだ何も選ばれていなければ1ページ目を選ぶ。
+  useEffect(() => {
+    if (step !== 2) return
+    if (selectedPage) return
+    const first = book.pages[0]
+    if (first) void book.selectPage(first.id)
+  }, [step, selectedPage, book.pages, book.selectPage])
 
   return (
     <div className="app-shell">
