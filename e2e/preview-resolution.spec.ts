@@ -44,7 +44,9 @@ test('previews are downscaled, not full-resolution originals', async ({ page }) 
   expect(thumb.height).toBeGreaterThan(thumb.width)
 
   // 一覧でページを選び直してから調整工程へ進むと、選び直した方が編集対象になる。
+  // サムネイルのクリックは拡大モーダルも開くので、続行前に閉じる。
   await page.locator('.page-list__thumb').first().click()
+  await page.keyboard.press('Escape')
   await page.getByText('調整へ進む').click()
   await expect(page.getByTestId('adjustment-canvas')).toBeVisible()
   await page.waitForFunction(() => {

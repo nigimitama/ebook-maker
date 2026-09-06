@@ -24,10 +24,9 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.getByText('次へ', { exact: true }).click()
   await expect(page.getByRole('listitem')).toHaveCount(2)
 
-  await page.getByText('見開き結合').click()
-  const checkboxes = page.locator('[data-testid^="merge-checkbox-"]')
-  await checkboxes.nth(0).check()
-  await checkboxes.nth(1).check()
+  const items = page.getByRole('listitem')
+  await items.nth(0).getByText('見開き結合', { exact: false }).click()
+  await items.nth(1).getByText('見開き結合', { exact: false }).click()
   await expect(page.getByTestId('merge-preview')).toBeVisible()
   await page.getByText('結合を確定').click()
   await expect(page.getByRole('listitem')).toHaveCount(1)

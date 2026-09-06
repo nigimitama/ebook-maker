@@ -13,6 +13,8 @@ export interface PageEntry {
   // ページは持たないため任意。読み込み時に生成して埋める。
   // `blobId` は常に無加工の原本を指す。
   thumbBlobId?: string
+  // 取り込み元のファイル名。fileName導入前に保存されたページは持たないため任意。
+  fileName?: string
   width: number
   height: number
   adjustment: AdjustmentParams

@@ -261,6 +261,7 @@ export function useBook(): UseBookResult {
             thumb.originalWidth,
             thumb.originalHeight,
             await thumb.toBlob(),
+            file.name,
           )
           const auto = computeAutoAdjustment(thumb.image)
           await store.updateAdjustment(page.id, auto)
