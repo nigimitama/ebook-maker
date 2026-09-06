@@ -497,3 +497,26 @@ label {
 .export-panel__error {
   color: var(--color-danger);
 }
+
+.progress-bar {
+  margin-top: 12px;
+}
+
+.progress-bar__label {
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.progress-bar__track {
+  height: 8px;
+  background: var(--color-divider);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.15s ease-out;
+}

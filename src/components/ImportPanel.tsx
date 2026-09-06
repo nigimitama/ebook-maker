@@ -1,9 +1,11 @@
 import { useRef } from 'react'
+import { ProgressBar } from './ProgressBar'
 
 interface ImportPanelProps {
   onImport: (files: File[]) => void
   pageCount?: number
   onClearAll?: () => void
+  importProgress?: { done: number; total: number } | null
 }
 
 interface DroppedEntry {
@@ -57,7 +59,7 @@ async function filesFromDataTransfer(dataTransfer: DataTransfer): Promise<File[]
   return files.flat()
 }
 
-export function ImportPanel({ onImport, pageCount = 0, onClearAll }: ImportPanelProps) {
+export function ImportPanel({ onImport, pageCount = 0, onClearAll, importProgress }: ImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -82,6 +84,14 @@ export function ImportPanel({ onImport, pageCount = 0, onClearAll }: ImportPanel
       }}
     >
       <p>画像をドラッグ&ドロップ、またはファイル/フォルダを選択</p>
+      {importProgress && (
+        <ProgressBar
+          done={importProgress.done}
+          total={importProgress.total}
+          label="読み込み中..."
+          testId="import-progress"
+        />
+      )}
       {pageCount > 0 && (
         <p className="import-count" data-testid="import-count">
           {pageCount}件登録済み

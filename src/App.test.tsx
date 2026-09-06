@@ -21,6 +21,7 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     clearAllPages: vi.fn(),
     setMetadata: vi.fn(),
     exportBook: vi.fn(),
+    importProgress: null,
     error: null,
     clearError: vi.fn(),
     ...overrides,
