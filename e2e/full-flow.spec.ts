@@ -20,11 +20,15 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.goto('/')
   await page.setInputFiles('[data-testid="file-input"]', [page1, page2])
 
-  await expect(page.getByRole('listitem')).toHaveCount(2)
-
-  await page.locator('[data-testid^="page-item-"]').first().locator('img').click()
+  // 取り込み → 調整: 最初に取り込んだページが自動で選択され、
+  // スライダー操作で明るさ/コントラストを調整できる。
+  await page.getByText('次へ', { exact: true }).click()
   await expect(page.getByTestId('brightness-slider')).toBeVisible()
   await page.getByTestId('brightness-slider').fill('20')
+
+  // 調整 → 並べ替え: 見開き結合はこの工程が担当する。
+  await page.getByText('並べ替えへ進む').click()
+  await expect(page.getByRole('listitem')).toHaveCount(2)
 
   await page.getByText('見開き結合').click()
   const checkboxes = page.locator('[data-testid^="merge-checkbox-"]')
@@ -34,10 +38,12 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.getByText('結合を確定').click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
 
+  // 並べ替え → 詳細&書き出し
+  await page.getByText('詳細情報へ進む').click()
   await page.getByTestId('title-input').fill('E2E Test Book')
   await page.getByTestId('author-input').fill('E2E Author')
 
-  await page.getByText('書き出し').click()
+  await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByTestId('download-link').click(),
@@ -56,10 +62,14 @@ test('exports an EPUB with one xhtml/image pair per page', async ({ page }) => {
 
   await page.goto('/')
   await page.setInputFiles('[data-testid="file-input"]', [page1])
+
+  await page.getByText('次へ', { exact: true }).click()
+  await page.getByText('並べ替えへ進む').click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
 
+  await page.getByText('詳細情報へ進む').click()
   await page.getByLabel('EPUB').click()
-  await page.getByText('書き出し').click()
+  await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByTestId('download-link').click(),

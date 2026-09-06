@@ -1,32 +1,39 @@
-:root {
-  --text: #1f2126;
-  --text-muted: #626873;
-  --bg: #ffffff;
-  --panel: #f6f7f9;
-  --border: #d7dae0;
-  --accent: #2f6fed;
-  --danger: #b3261e;
-  --danger-bg: #fdecea;
+@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
 
-  /* Keeps native widgets (range sliders, radios, scrollbars) themed to match
-     the palette below instead of staying light against a dark background. */
+:root {
+  --color-bg: #f2f2f3;
+  --color-surface: #e9e9ea;
+  --color-text: #1d1f20;
+  --color-text-muted: color-mix(in srgb, var(--color-text) 55%, transparent);
+  --color-accent: #5980a6;
+  --color-accent-strong: #416180;
+  --color-divider: color-mix(in srgb, #1d1f20 16%, transparent);
+  --color-danger: #b3261e;
+  --color-danger-bg: #fdecea;
+
+  --font-heading: 'Barlow Condensed', system-ui, sans-serif;
+  --font-body: 'Barlow', system-ui, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+
+  /* ネイティブのフォーム部品(レンジ、ラジオ、チェックボックス、スクロールバー)を
+     配色に追従させる。 */
   color-scheme: light dark;
-  font: 16px/1.5 system-ui, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
-  color: var(--text);
-  background: var(--bg);
+  font: 16px/1.55 var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --text: #e6e8ec;
-    --text-muted: #a0a6b0;
-    --bg: #16181d;
-    --panel: #1f222a;
-    --border: #363b45;
-    --accent: #7aa2f7;
-    --danger: #ff8a80;
-    --danger-bg: #3a1d1a;
+    --color-bg: #1b1c1d;
+    --color-surface: #232426;
+    --color-text: #ececec;
+    --color-text-muted: color-mix(in srgb, var(--color-text) 55%, transparent);
+    --color-accent: #7ea3c4;
+    --color-accent-strong: #a3c1dc;
+    --color-divider: color-mix(in srgb, #ececeb 18%, transparent);
+    --color-danger: #ff8a80;
+    --color-danger-bg: #3a1d1a;
   }
 }
 
@@ -38,8 +45,8 @@ body {
   margin: 0;
 }
 
-/* Scans are thousands of pixels wide; without this every thumbnail and the
-   editor canvas render at natural size and blow out the page width. */
+/* スキャンは数千pxに及ぶため、これがないとサムネイルもエディタのcanvasも
+   原寸で描画されて画面幅を突き破る。 */
 img,
 canvas {
   max-width: 100%;
@@ -47,16 +54,22 @@ canvas {
   display: block;
 }
 
-h1 {
-  font-size: 24px;
+h1,
+h2,
+h3,
+h4 {
+  font-family: var(--font-heading);
   font-weight: 600;
-  margin: 0 0 16px;
+  letter-spacing: -0.01em;
+  margin: 0 0 8px;
+}
+
+h1 {
+  font-size: 26px;
 }
 
 h2 {
-  font-size: 16px;
-  font-weight: 600;
-  margin: 0 0 8px;
+  font-size: 17px;
 }
 
 p {
@@ -64,53 +77,88 @@ p {
 }
 
 button {
-  font: inherit;
-  padding: 6px 12px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--panel);
-  color: inherit;
+  font: 600 14px var(--font-heading);
+  padding: 7px 16px;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
+  background: transparent;
+  color: var(--color-text);
   cursor: pointer;
 }
 
 button:hover:not(:disabled) {
-  border-color: var(--accent);
+  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+}
+
+button:active:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text) 14%, transparent);
 }
 
 button:disabled {
   cursor: default;
-  opacity: 0.5;
+  opacity: 0.45;
+}
+
+button:focus-visible,
+input:focus-visible,
+img:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
 }
 
 input[type='text'] {
-  font: inherit;
-  padding: 6px 8px;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--bg);
-  color: inherit;
+  font: 14px var(--font-body);
+  padding: 6px 10px;
+  border: 1px solid var(--color-divider);
+  border-radius: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+input[type='range'],
+input[type='radio'],
+input[type='checkbox'] {
+  accent-color: var(--color-accent);
 }
 
 label {
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  font-size: 14px;
 }
 
-.app {
+/* — 主要導線のボタン(次へ/戻る等)。ワイヤーフレームの中で唯一の
+   塗りつぶしオブジェクトとして accent を塗る。 — */
+.btn-primary {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-accent-strong);
+  border-color: var(--color-accent-strong);
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--color-accent-strong);
+  background: transparent;
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+}
+
+.app-shell {
   max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px 48px;
+  padding: 32px 16px 48px;
 }
 
-.app > * + * {
-  margin-top: 24px;
-}
-
-.panel {
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  padding: 16px;
+.app-shell > h1 {
+  margin-bottom: 20px;
 }
 
 .error-banner {
@@ -119,21 +167,167 @@ label {
   justify-content: space-between;
   gap: 12px;
   padding: 12px 16px;
-  border: 1px solid var(--danger);
-  border-radius: 6px;
-  background: var(--danger-bg);
-  color: var(--danger);
+  margin-bottom: 20px;
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-bg);
+  color: var(--color-danger);
+}
+
+/* — ウィザード: 左レール + 現在の工程のみを表示する本体 — */
+.wizard {
+  display: flex;
+  align-items: flex-start;
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+}
+
+.rail {
+  width: 168px;
+  flex: none;
+  border-right: 1px solid var(--color-divider);
+  padding: 22px 16px;
+  background: var(--color-surface);
+}
+
+.rail__title {
+  font: 600 11px var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-muted);
+  margin-bottom: 14px;
+}
+
+.rail__steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+}
+
+.rail__steps::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--color-divider);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+}
+
+.step--active {
+  cursor: default;
+  font-family: var(--font-heading);
+  font-weight: 600;
+}
+
+.step--done {
+  cursor: pointer;
+  color: var(--color-accent-strong);
+}
+
+.step--disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.stepnum {
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  font: 600 11px var(--font-heading);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  border: 1px solid var(--color-divider);
+  background: var(--color-bg);
+}
+
+.step--active .stepnum {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
+  color: var(--color-bg);
+}
+
+.step--done .stepnum {
+  border-color: var(--color-accent-strong);
+  color: var(--color-accent-strong);
+}
+
+.step-content {
+  flex: 1;
+  min-width: 0;
+  padding: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.nav-actions {
+  display: flex;
+}
+
+.nav-actions--end {
+  justify-content: flex-end;
+}
+
+.nav-actions--between {
+  justify-content: space-between;
+}
+
+.nav-actions--start {
+  justify-content: flex-start;
+}
+
+.panel {
+  border: 1px solid var(--color-divider);
+  padding: 16px;
 }
 
 .dropzone {
-  border: 2px dashed var(--border);
-  border-radius: 6px;
-  padding: 24px 16px;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+  padding: 40px 16px;
   text-align: center;
 }
 
 .dropzone p {
-  color: var(--text-muted);
+  color: var(--color-text-muted);
+}
+
+.dropzone button {
+  margin: 0 4px;
+}
+
+/* — 調整工程の簡易フィルムストリップ(どのページを編集するかの選択だけを担う。
+   並べ替え・削除・結合は並べ替え工程の PageList が担当する) — */
+.filmstrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.filmstrip__thumb {
+  width: 56px;
+  height: 72px;
+  flex: none;
+  object-fit: cover;
+  cursor: pointer;
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
+}
+
+.filmstrip__thumb--selected {
+  border: 2px solid var(--color-accent);
 }
 
 .page-list__items {
@@ -142,7 +336,7 @@ label {
   gap: 8px;
   list-style: none;
   padding: 0;
-  margin: 12px 0 0;
+  margin: 0;
 }
 
 .page-list__item {
@@ -152,13 +346,12 @@ label {
   gap: 6px;
   width: 140px;
   padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
 }
 
 .page-list__item--selected {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--color-accent);
 }
 
 .page-list__thumb {
@@ -166,7 +359,7 @@ label {
   height: 140px;
   object-fit: contain;
   cursor: pointer;
-  background: var(--bg);
+  background: var(--color-bg);
 }
 
 .merge-preview {
@@ -176,8 +369,7 @@ label {
   gap: 8px;
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid var(--accent);
-  border-radius: 6px;
+  border: 1px solid var(--color-accent);
 }
 
 .merge-preview img {
@@ -185,17 +377,16 @@ label {
   width: auto;
 }
 
-/* canvas is a replaced element: width/height auto plus both max-* bounds
-   scales a full-resolution scan down while keeping its aspect ratio. */
+/* canvasは置換要素なので、width/heightをautoにしつつ両方向にmax-*を
+   掛けることで、フル解像度のスキャンをアスペクト比を保ったまま縮小表示できる。 */
 .adjustment-editor__canvas {
   width: auto;
   height: auto;
   max-width: 100%;
   max-height: 60vh;
   margin: 0 auto;
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  background: var(--panel);
+  border: 1px solid var(--color-divider);
+  background: var(--color-surface);
 }
 
 .adjustment-editor__controls {
@@ -203,7 +394,6 @@ label {
   flex-wrap: wrap;
   align-items: center;
   gap: 16px;
-  margin-top: 12px;
 }
 
 .metadata-form__fields {
@@ -219,5 +409,5 @@ label {
 }
 
 .export-panel__error {
-  color: var(--danger);
+  color: var(--color-danger);
 }
