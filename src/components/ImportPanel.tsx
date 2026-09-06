@@ -6,16 +6,62 @@ interface ImportPanelProps {
   onClearAll?: () => void
 }
 
-function filterImageFiles(fileList: FileList | null): File[] {
-  if (!fileList) return []
-  return Array.from(fileList).filter((file) => file.type.startsWith('image/'))
+interface DroppedEntry {
+  isFile: boolean
+  isDirectory: boolean
+}
+
+interface DroppedFileEntry extends DroppedEntry {
+  file: (resolve: (file: File) => void) => void
+}
+
+interface DroppedDirectoryEntry extends DroppedEntry {
+  createReader: () => {
+    readEntries: (resolve: (entries: DroppedEntry[]) => void) => void
+  }
+}
+
+function readDirectoryEntries(entry: DroppedDirectoryEntry): Promise<DroppedEntry[]> {
+  return new Promise((resolve) => entry.createReader().readEntries(resolve))
+}
+
+function readEntryFile(entry: DroppedFileEntry): Promise<File> {
+  return new Promise((resolve) => entry.file(resolve))
+}
+
+async function filesFromEntry(entry: DroppedEntry): Promise<File[]> {
+  if (entry.isFile) return [await readEntryFile(entry as DroppedFileEntry)]
+  if (entry.isDirectory) {
+    const entries = await readDirectoryEntries(entry as DroppedDirectoryEntry)
+    const files = await Promise.all(entries.map(filesFromEntry))
+    return files.flat()
+  }
+  return []
+}
+
+function filterImageFiles(files: File[] | FileList | null): File[] {
+  if (!files) return []
+  return Array.from(files).filter((file) => file.type.startsWith('image/'))
+}
+
+function hasDirectoryEntries(dataTransfer: DataTransfer): boolean {
+  const items = dataTransfer.items
+  return Boolean(items && items.length > 0 && 'webkitGetAsEntry' in items[0])
+}
+
+async function filesFromDataTransfer(dataTransfer: DataTransfer): Promise<File[]> {
+  const entries = Array.from(dataTransfer.items)
+    .map((item) => item.webkitGetAsEntry() as unknown as DroppedEntry | null)
+    .filter((entry): entry is DroppedEntry => entry !== null)
+  const files = await Promise.all(entries.map(filesFromEntry))
+  return files.flat()
 }
 
 export function ImportPanel({ onImport, pageCount = 0, onClearAll }: ImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
-  function handleFileList(fileList: FileList | null) {
+  function handleFileList(fileList: File[] | FileList | null) {
     const files = filterImageFiles(fileList)
     if (files.length > 0) onImport(files)
   }
@@ -27,7 +73,12 @@ export function ImportPanel({ onImport, pageCount = 0, onClearAll }: ImportPanel
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault()
-        handleFileList(event.dataTransfer.files)
+        const dataTransfer = event.dataTransfer
+        if (hasDirectoryEntries(dataTransfer)) {
+          filesFromDataTransfer(dataTransfer).then((files) => handleFileList(files))
+        } else {
+          handleFileList(dataTransfer.files)
+        }
       }}
     >
       <p>画像をドラッグ&ドロップ、またはファイル/フォルダを選択</p>
