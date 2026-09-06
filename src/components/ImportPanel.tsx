@@ -23,8 +23,24 @@ interface DroppedDirectoryEntry extends DroppedEntry {
   }
 }
 
-function readDirectoryEntries(entry: DroppedDirectoryEntry): Promise<DroppedEntry[]> {
-  return new Promise((resolve) => entry.createReader().readEntries(resolve))
+function readEntriesBatch(
+  reader: { readEntries: (resolve: (entries: DroppedEntry[]) => void) => void },
+): Promise<DroppedEntry[]> {
+  return new Promise((resolve) => reader.readEntries(resolve))
+}
+
+// readEntries は仕様上1回の呼び出しで返せる件数に上限があり(Chromeの実装では
+// 100件)、空配列が返るまで呼び直さないと100件を超えるフォルダの中身を
+// 取りこぼす。
+async function readDirectoryEntries(entry: DroppedDirectoryEntry): Promise<DroppedEntry[]> {
+  const reader = entry.createReader()
+  const all: DroppedEntry[] = []
+  while (true) {
+    const batch = await readEntriesBatch(reader)
+    if (batch.length === 0) break
+    all.push(...batch)
+  }
+  return all
 }
 
 function readEntryFile(entry: DroppedFileEntry): Promise<File> {
