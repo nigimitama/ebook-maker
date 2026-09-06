@@ -140,6 +140,13 @@ export class ImageStore {
     await txDone(tx)
   }
 
+  async clearAll(): Promise<void> {
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
+    tx.objectStore(PAGE_STORE).clear()
+    tx.objectStore(BLOB_STORE).clear()
+    await txDone(tx)
+  }
+
   async replacePagesWithMerged(
     removeIds: [string, string],
     blob: Blob,

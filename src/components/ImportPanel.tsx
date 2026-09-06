@@ -3,6 +3,7 @@ import { useRef } from 'react'
 interface ImportPanelProps {
   onImport: (files: File[]) => void
   pageCount?: number
+  onClearAll?: () => void
 }
 
 function filterImageFiles(fileList: FileList | null): File[] {
@@ -10,7 +11,7 @@ function filterImageFiles(fileList: FileList | null): File[] {
   return Array.from(fileList).filter((file) => file.type.startsWith('image/'))
 }
 
-export function ImportPanel({ onImport, pageCount = 0 }: ImportPanelProps) {
+export function ImportPanel({ onImport, pageCount = 0, onClearAll }: ImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -33,6 +34,18 @@ export function ImportPanel({ onImport, pageCount = 0 }: ImportPanelProps) {
       {pageCount > 0 && (
         <p className="import-count" data-testid="import-count">
           {pageCount}件登録済み
+          {onClearAll && (
+            <button
+              type="button"
+              className="import-count__clear"
+              data-testid="clear-all-button"
+              onClick={() => {
+                if (window.confirm('登録済みのファイルをすべて登録解除しますか？')) onClearAll()
+              }}
+            >
+              すべて登録解除
+            </button>
+          )}
         </p>
       )}
       <button type="button" onClick={() => fileInputRef.current?.click()}>

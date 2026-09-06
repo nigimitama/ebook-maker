@@ -53,4 +53,25 @@ describe('ImportPanel', () => {
     render(<ImportPanel onImport={vi.fn()} pageCount={3} />)
     expect(screen.getByTestId('import-count')).toHaveTextContent('3件登録済み')
   })
+
+  it('does not show a clear-all button when onClearAll is not provided', () => {
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} />)
+    expect(screen.queryByTestId('clear-all-button')).not.toBeInTheDocument()
+  })
+
+  it('calls onClearAll after confirmation when the clear-all button is clicked', () => {
+    const onClearAll = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} onClearAll={onClearAll} />)
+    fireEvent.click(screen.getByTestId('clear-all-button'))
+    expect(onClearAll).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not call onClearAll when the confirmation is dismissed', () => {
+    const onClearAll = vi.fn()
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    render(<ImportPanel onImport={vi.fn()} pageCount={3} onClearAll={onClearAll} />)
+    fireEvent.click(screen.getByTestId('clear-all-button'))
+    expect(onClearAll).not.toHaveBeenCalled()
+  })
 })
