@@ -6,33 +6,33 @@ interface ImportPanelProps {
   onClearAll?: () => void
 }
 
-interface FileSystemEntry {
+interface DroppedEntry {
   isFile: boolean
   isDirectory: boolean
 }
 
-interface FileSystemFileEntry extends FileSystemEntry {
+interface DroppedFileEntry extends DroppedEntry {
   file: (resolve: (file: File) => void) => void
 }
 
-interface FileSystemDirectoryEntry extends FileSystemEntry {
+interface DroppedDirectoryEntry extends DroppedEntry {
   createReader: () => {
-    readEntries: (resolve: (entries: FileSystemEntry[]) => void) => void
+    readEntries: (resolve: (entries: DroppedEntry[]) => void) => void
   }
 }
 
-function readDirectoryEntries(entry: FileSystemDirectoryEntry): Promise<FileSystemEntry[]> {
+function readDirectoryEntries(entry: DroppedDirectoryEntry): Promise<DroppedEntry[]> {
   return new Promise((resolve) => entry.createReader().readEntries(resolve))
 }
 
-function readEntryFile(entry: FileSystemFileEntry): Promise<File> {
+function readEntryFile(entry: DroppedFileEntry): Promise<File> {
   return new Promise((resolve) => entry.file(resolve))
 }
 
-async function filesFromEntry(entry: FileSystemEntry): Promise<File[]> {
-  if (entry.isFile) return [await readEntryFile(entry as FileSystemFileEntry)]
+async function filesFromEntry(entry: DroppedEntry): Promise<File[]> {
+  if (entry.isFile) return [await readEntryFile(entry as DroppedFileEntry)]
   if (entry.isDirectory) {
-    const entries = await readDirectoryEntries(entry as FileSystemDirectoryEntry)
+    const entries = await readDirectoryEntries(entry as DroppedDirectoryEntry)
     const files = await Promise.all(entries.map(filesFromEntry))
     return files.flat()
   }
@@ -51,8 +51,8 @@ function hasDirectoryEntries(dataTransfer: DataTransfer): boolean {
 
 async function filesFromDataTransfer(dataTransfer: DataTransfer): Promise<File[]> {
   const entries = Array.from(dataTransfer.items)
-    .map((item) => (item as DataTransferItem & { webkitGetAsEntry: () => FileSystemEntry | null }).webkitGetAsEntry())
-    .filter((entry): entry is FileSystemEntry => entry !== null)
+    .map((item) => item.webkitGetAsEntry() as unknown as DroppedEntry | null)
+    .filter((entry): entry is DroppedEntry => entry !== null)
   const files = await Promise.all(entries.map(filesFromEntry))
   return files.flat()
 }
