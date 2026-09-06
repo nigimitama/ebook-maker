@@ -8,7 +8,7 @@ import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import type { PageEntry } from './types'
 
-const STEPS = ['取り込み', '並べ替え', '調整', '詳細＆書き出し'] as const
+const STEPS = ['読み込み', '並べ替え', '調整', '詳細＆書き出し'] as const
 
 interface PageFilmstripProps {
   pages: PageEntry[]

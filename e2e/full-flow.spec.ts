@@ -20,7 +20,7 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.goto('/')
   await page.setInputFiles('[data-testid="file-input"]', [page1, page2])
 
-  // 取り込み → 並べ替え: 見開き結合はこの工程が担当する。
+  // 読み込み → 並べ替え: 見開き結合はこの工程が担当する。
   await page.getByText('次へ', { exact: true }).click()
   await expect(page.getByRole('listitem')).toHaveCount(2)
 

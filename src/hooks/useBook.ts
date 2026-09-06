@@ -116,7 +116,7 @@ export function useBook(): UseBookResult {
           return
         }
         // 置き換えではなくマージする: このeffectが listPages/getBlob を待っている間に
-        // 取り込みが完了することがあり、置き換えると直前に作られたサムネイルを
+        // 読み込みが完了することがあり、置き換えると直前に作られたサムネイルを
         // 消して(かつリークさせて)しまう。
         setThumbnails((current) => ({ ...restored, ...current }))
         setPages(loaded)
@@ -246,7 +246,7 @@ export function useBook(): UseBookResult {
       const store = await getStore()
       if (!store) return
       let firstNewId: string | null = null
-      // 読めない・非対応のファイルが1つあっても取り込み全体を止めない:
+      // 読めない・非対応のファイルが1つあっても読み込み全体を止めない:
       // そのファイルは飛ばして続行し、後でまとめて名前を報告する(仕様 §エラーハンドリング)。
       const failedNames: string[] = []
       let quotaExceeded = false
