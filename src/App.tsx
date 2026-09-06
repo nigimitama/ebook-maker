@@ -8,7 +8,7 @@ import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import type { PageEntry } from './types'
 
-const STEPS = ['取り込み', '調整', '並べ替え', '詳細＆書き出し'] as const
+const STEPS = ['取り込み', '並べ替え', '調整', '詳細＆書き出し'] as const
 
 interface PageFilmstripProps {
   pages: PageEntry[]
@@ -108,6 +108,28 @@ export function App() {
 
           {step === 1 && (
             <>
+              <PageList
+                pages={book.pages}
+                thumbnails={book.thumbnails}
+                selectedPageId={book.selectedPageId}
+                onSelect={book.selectPage}
+                onReorder={book.reorderPages}
+                onDelete={book.deletePage}
+                onConfirmMerge={book.confirmMerge}
+              />
+              <div className="nav-actions nav-actions--between">
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
+                  戻る
+                </button>
+                <button type="button" className="btn btn-primary" onClick={() => goTo(2)}>
+                  調整へ進む
+                </button>
+              </div>
+            </>
+          )}
+
+          {step === 2 && (
+            <>
               {selectedPage &&
                 (book.selectedImage ? (
                   <AdjustmentEditor
@@ -128,28 +150,6 @@ export function App() {
                 thumbnails={book.thumbnails}
                 selectedPageId={book.selectedPageId}
                 onSelect={book.selectPage}
-              />
-              <div className="nav-actions nav-actions--between">
-                <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
-                  戻る
-                </button>
-                <button type="button" className="btn btn-primary" onClick={() => goTo(2)}>
-                  並べ替えへ進む
-                </button>
-              </div>
-            </>
-          )}
-
-          {step === 2 && (
-            <>
-              <PageList
-                pages={book.pages}
-                thumbnails={book.thumbnails}
-                selectedPageId={book.selectedPageId}
-                onSelect={book.selectPage}
-                onReorder={book.reorderPages}
-                onDelete={book.deletePage}
-                onConfirmMerge={book.confirmMerge}
               />
               <div className="nav-actions nav-actions--between">
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
