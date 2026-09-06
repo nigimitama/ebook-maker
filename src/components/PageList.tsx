@@ -22,7 +22,9 @@ function displayNameOf(page: PageEntry): string {
 }
 
 function sortIdsByName(pages: PageEntry[], direction: 'asc' | 'desc'): string[] {
-  const sorted = [...pages].sort((a, b) => displayNameOf(a).localeCompare(displayNameOf(b)))
+  const sorted = [...pages].sort((a, b) =>
+    displayNameOf(a).localeCompare(displayNameOf(b), undefined, { numeric: true }),
+  )
   if (direction === 'desc') sorted.reverse()
   return sorted.map((p) => p.id)
 }

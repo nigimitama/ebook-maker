@@ -148,6 +148,17 @@ describe('PageList', () => {
     expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(昇順)')
   })
 
+  it('sorts numeric parts of file names naturally, like Windows Explorer', () => {
+    const numberedPages = [
+      page('x', 0, 'page10.png'),
+      page('y', 1, 'page2.png'),
+      page('z', 2, 'page1.png'),
+    ]
+    const props = { ...baseProps(), pages: numberedPages }
+    render(<PageList {...props} />)
+    expect(props.onReorder).toHaveBeenCalledWith(['z', 'y', 'x'])
+  })
+
   it('marks the sort status as manual after a drag-and-drop reorder', () => {
     const props = baseProps()
     render(<PageList {...props} />)
