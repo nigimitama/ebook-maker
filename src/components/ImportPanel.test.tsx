@@ -18,6 +18,34 @@ describe('ImportPanel', () => {
     expect(onImport).toHaveBeenCalledWith([imageFile])
   })
 
+  it('calls onImport with image files inside a dropped folder', async () => {
+    const onImport = vi.fn()
+    render(<ImportPanel onImport={onImport} />)
+    const dropzone = screen.getByTestId('import-dropzone')
+    const imageFile = makeImageFile('d.png')
+
+    const fileEntry = {
+      isFile: true,
+      isDirectory: false,
+      file: (resolve: (file: File) => void) => resolve(imageFile),
+    }
+    let readCalls = 0
+    const directoryEntry = {
+      isFile: false,
+      isDirectory: true,
+      createReader: () => ({
+        readEntries: (resolve: (entries: unknown[]) => void) => {
+          readCalls += 1
+          resolve(readCalls === 1 ? [fileEntry] : [])
+        },
+      }),
+    }
+    const item = { webkitGetAsEntry: () => directoryEntry }
+
+    fireEvent.drop(dropzone, { dataTransfer: { items: [item], files: [] } })
+    await vi.waitFor(() => expect(onImport).toHaveBeenCalledWith([imageFile]))
+  })
+
   it('calls onImport with files chosen via the file picker input', () => {
     const onImport = vi.fn()
     render(<ImportPanel onImport={onImport} />)
