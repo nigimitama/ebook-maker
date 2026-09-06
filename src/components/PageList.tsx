@@ -21,10 +21,29 @@ function displayNameOf(page: PageEntry): string {
   return page.fileName ?? `ページ ${page.order + 1}`
 }
 
+// localeCompare の numeric オプションは "." を "_" より後ろとして扱う(ICUの
+// デフォルト照合順序による、コードポイント順46<95とは逆の結果)ため、
+// "scan.jpg" が "scan_001.jpg" より後ろに来てしまう。Windowsエクスプローラーの
+// 自然順ソートに合わせるため、数字の並びだけを数値として比較する独自実装を使う。
+function compareNatural(a: string, b: string): number {
+  const chunksA = a.match(/\d+|\D+/g) ?? []
+  const chunksB = b.match(/\d+|\D+/g) ?? []
+  const len = Math.min(chunksA.length, chunksB.length)
+  for (let i = 0; i < len; i++) {
+    const chunkA = chunksA[i]
+    const chunkB = chunksB[i]
+    if (/^\d+$/.test(chunkA) && /^\d+$/.test(chunkB)) {
+      const diff = Number(chunkA) - Number(chunkB)
+      if (diff !== 0) return diff
+    } else if (chunkA !== chunkB) {
+      return chunkA < chunkB ? -1 : 1
+    }
+  }
+  return chunksA.length - chunksB.length
+}
+
 function sortIdsByName(pages: PageEntry[], direction: 'asc' | 'desc'): string[] {
-  const sorted = [...pages].sort((a, b) =>
-    displayNameOf(a).localeCompare(displayNameOf(b), undefined, { numeric: true }),
-  )
+  const sorted = [...pages].sort((a, b) => compareNatural(displayNameOf(a), displayNameOf(b)))
   if (direction === 'desc') sorted.reverse()
   return sorted.map((p) => p.id)
 }

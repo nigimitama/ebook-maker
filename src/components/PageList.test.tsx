@@ -159,6 +159,29 @@ describe('PageList', () => {
     expect(props.onReorder).toHaveBeenCalledWith(['z', 'y', 'x'])
   })
 
+  it('sorts a base name before its numbered suffix variants (ascending), like Windows Explorer', () => {
+    const scanPages = [
+      page('p2', 1, '20260907083639_002.jpg'),
+      page('p0', 0, '20260907083639.jpg'),
+      page('p1', 2, '20260907083639_001.jpg'),
+    ]
+    const props = { ...baseProps(), pages: scanPages }
+    render(<PageList {...props} />)
+    expect(props.onReorder).toHaveBeenCalledWith(['p0', 'p1', 'p2'])
+  })
+
+  it('reverses that same order when sorted descending', () => {
+    const scanPages = [
+      page('p0', 0, '20260907083639.jpg'),
+      page('p1', 1, '20260907083639_001.jpg'),
+      page('p2', 2, '20260907083639_002.jpg'),
+    ]
+    const props = { ...baseProps(), pages: scanPages }
+    render(<PageList {...props} />)
+    fireEvent.click(screen.getByText('ファイル名降順'))
+    expect(props.onReorder).toHaveBeenCalledWith(['p2', 'p1', 'p0'])
+  })
+
   it('marks the sort status as manual after a drag-and-drop reorder', () => {
     const props = baseProps()
     render(<PageList {...props} />)
