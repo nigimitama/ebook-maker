@@ -21,6 +21,7 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     clearAllPages: vi.fn(),
     setMetadata: vi.fn(),
     exportBook: vi.fn(),
+    importProgress: null,
     error: null,
     clearError: vi.fn(),
     ...overrides,
@@ -95,6 +96,15 @@ describe('App', () => {
     fireEvent.click(screen.getByText('調整へ進む'))
     expect(screen.getByTestId('preview-loading')).toBeInTheDocument()
     expect(screen.queryByTestId('adjustment-canvas')).not.toBeInTheDocument()
+  })
+
+  it('selects the first page automatically on entering the 調整 step', () => {
+    const props = mockBook({ pages: [page], thumbnails: { a: 'blob:a' } })
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(props)
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('調整へ進む'))
+    expect(props.selectPage).toHaveBeenCalledWith('a')
   })
 
   it('shows an error banner when the hook reports an error', () => {

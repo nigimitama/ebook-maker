@@ -21,18 +21,22 @@ export interface ExportRequest {
 
 export type PngEncoder = (image: RawImage) => Promise<Uint8Array>
 export type BlobDecoder = (blob: Blob) => Promise<RawImage>
+export type ExportProgress = (done: number, total: number) => void
 
 export async function runExport(
   request: ExportRequest,
   encodePng: PngEncoder,
   decodeBlob: BlobDecoder,
+  onProgress?: ExportProgress,
 ): Promise<Uint8Array> {
   const exportPages: ExportPage[] = []
-  for (const page of request.pages) {
+  const total = request.pages.length
+  for (const [index, page] of request.pages.entries()) {
     const decoded = await decodeBlob(page.blob)
     const adjusted = applyAdjustment(decoded, page.adjustment)
     const png = await encodePng(adjusted)
     exportPages.push({ png, width: adjusted.width, height: adjusted.height })
+    onProgress?.(index + 1, total)
   }
   return request.format === 'pdf'
     ? buildPdf(exportPages, request.metadata)

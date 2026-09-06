@@ -340,6 +340,18 @@ label {
   border: 2px solid var(--color-accent);
 }
 
+.page-list__sort {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.page-list__sort-label {
+  color: var(--color-text-muted);
+  font-size: 0.9em;
+}
+
 /* — 並べ替え工程: 1ファイル1行の縦積みリスト。カード+影ではなく、
    台帳のように罫線で区切って一覧性を優先する。 — */
 .page-list__items {
@@ -496,4 +508,27 @@ label {
 
 .export-panel__error {
   color: var(--color-danger);
+}
+
+.progress-bar {
+  margin-top: 12px;
+}
+
+.progress-bar__label {
+  font-size: 0.85em;
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.progress-bar__track {
+  height: 8px;
+  background: var(--color-divider);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar__fill {
+  height: 100%;
+  background: var(--color-accent);
+  transition: width 0.15s ease-out;
 }

@@ -128,4 +128,66 @@ describe('PageList', () => {
     fireEvent.click(screen.getByText('結合を確定'))
     expect(props.onConfirmMerge).toHaveBeenCalledWith('b', 'c')
   })
+
+  it('defaults to file-name ascending order, shown in the sort status', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(昇順)')
+    // 与えられたページは既にファイル名昇順なので、初期化のための並べ替えは走らない。
+    expect(props.onReorder).not.toHaveBeenCalled()
+  })
+
+  it('sorts by file name ascending/descending when the buttons are clicked', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    fireEvent.click(screen.getByText('ファイル名降順'))
+    expect(props.onReorder).toHaveBeenCalledWith(['c', 'b', 'a'])
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(降順)')
+    fireEvent.click(screen.getByText('ファイル名昇順'))
+    expect(props.onReorder).toHaveBeenCalledWith(['a', 'b', 'c'])
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('ファイル名(昇順)')
+  })
+
+  it('sorts numeric parts of file names naturally, like Windows Explorer', () => {
+    const numberedPages = [
+      page('x', 0, 'page10.png'),
+      page('y', 1, 'page2.png'),
+      page('z', 2, 'page1.png'),
+    ]
+    const props = { ...baseProps(), pages: numberedPages }
+    render(<PageList {...props} />)
+    expect(props.onReorder).toHaveBeenCalledWith(['z', 'y', 'x'])
+  })
+
+  it('sorts a base name before its numbered suffix variants (ascending), like Windows Explorer', () => {
+    const scanPages = [
+      page('p2', 1, '20260907083639_002.jpg'),
+      page('p0', 0, '20260907083639.jpg'),
+      page('p1', 2, '20260907083639_001.jpg'),
+    ]
+    const props = { ...baseProps(), pages: scanPages }
+    render(<PageList {...props} />)
+    expect(props.onReorder).toHaveBeenCalledWith(['p0', 'p1', 'p2'])
+  })
+
+  it('reverses that same order when sorted descending', () => {
+    const scanPages = [
+      page('p0', 0, '20260907083639.jpg'),
+      page('p1', 1, '20260907083639_001.jpg'),
+      page('p2', 2, '20260907083639_002.jpg'),
+    ]
+    const props = { ...baseProps(), pages: scanPages }
+    render(<PageList {...props} />)
+    fireEvent.click(screen.getByText('ファイル名降順'))
+    expect(props.onReorder).toHaveBeenCalledWith(['p2', 'p1', 'p0'])
+  })
+
+  it('marks the sort status as manual after a drag-and-drop reorder', () => {
+    const props = baseProps()
+    render(<PageList {...props} />)
+    fireEvent.dragStart(screen.getByTestId('page-item-a'))
+    fireEvent.dragOver(screen.getByTestId('page-item-c'))
+    fireEvent.drop(screen.getByTestId('page-item-c'))
+    expect(screen.getByTestId('sort-status')).toHaveTextContent('手動')
+  })
 })

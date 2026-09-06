@@ -26,7 +26,8 @@ export interface UseBookResult {
   clearAllPages: () => Promise<void>
   confirmMerge: (firstId: string, secondId: string) => Promise<void>
   setMetadata: (metadata: BookMetadata) => void
-  exportBook: (format: 'pdf' | 'epub') => Promise<Blob>
+  exportBook: (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => Promise<Blob>
+  importProgress: { done: number; total: number } | null
   error: string | null
   clearError: () => void
 }
@@ -63,6 +64,7 @@ export function useBook(): UseBookResult {
   const [metadata, setMetadata] = useState<BookMetadata>({ title: '', author: '' })
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
   const [selectedImage, setSelectedImage] = useState<RawImage | null>(null)
+  const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
@@ -116,7 +118,7 @@ export function useBook(): UseBookResult {
           return
         }
         // 置き換えではなくマージする: このeffectが listPages/getBlob を待っている間に
-        // 取り込みが完了することがあり、置き換えると直前に作られたサムネイルを
+        // 読み込みが完了することがあり、置き換えると直前に作られたサムネイルを
         // 消して(かつリークさせて)しまう。
         setThumbnails((current) => ({ ...restored, ...current }))
         setPages(loaded)
@@ -246,11 +248,12 @@ export function useBook(): UseBookResult {
       const store = await getStore()
       if (!store) return
       let firstNewId: string | null = null
-      // 読めない・非対応のファイルが1つあっても取り込み全体を止めない:
+      // 読めない・非対応のファイルが1つあっても読み込み全体を止めない:
       // そのファイルは飛ばして続行し、後でまとめて名前を報告する(仕様 §エラーハンドリング)。
       const failedNames: string[] = []
       let quotaExceeded = false
-      for (const file of files) {
+      setImportProgress({ done: 0, total: files.length })
+      for (const [index, file] of files.entries()) {
         try {
           // ここで原本をフル解像度でデコードすることはない。自動補正の
           // ヒストグラムはサムネイル相当の画素で十分で、書き出すページに必要な
@@ -274,7 +277,9 @@ export function useBook(): UseBookResult {
           if (isQuotaExceeded(fileError)) quotaExceeded = true
           failedNames.push(file.name)
         }
+        setImportProgress({ done: index + 1, total: files.length })
       }
+      setImportProgress(null)
       if (failedNames.length > 0) {
         setError(
           quotaExceeded
@@ -441,7 +446,7 @@ export function useBook(): UseBookResult {
   )
 
   const exportBook = useCallback(
-    async (format: 'pdf' | 'epub') => {
+    async (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => {
       const store = storeRef.current
       if (!store) throw new Error('store not ready')
       // スライダー操作直後の書き出しで、遅延待ちのままの最後の調整値を
@@ -456,7 +461,7 @@ export function useBook(): UseBookResult {
         if (!blob) throw new Error(`image data not found for page: ${page.id}`)
         exportPages.push({ blob, adjustment: page.adjustment })
       }
-      return runExportInWorker({ format, metadata, pages: exportPages })
+      return runExportInWorker({ format, metadata, pages: exportPages }, onProgress)
     },
     [metadata, flushPendingAdjustments],
   )
@@ -477,6 +482,7 @@ export function useBook(): UseBookResult {
     confirmMerge,
     setMetadata,
     exportBook,
+    importProgress,
     error,
     clearError,
   }

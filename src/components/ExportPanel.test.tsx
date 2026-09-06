@@ -7,7 +7,7 @@ describe('ExportPanel', () => {
     const onExport = vi.fn().mockResolvedValue(new Blob(['x']))
     render(<ExportPanel onExport={onExport} />)
     fireEvent.click(screen.getByText('書き出し'))
-    await waitFor(() => expect(onExport).toHaveBeenCalledWith('pdf'))
+    await waitFor(() => expect(onExport).toHaveBeenCalledWith('pdf', expect.any(Function)))
   })
 
   it('calls onExport with epub when the EPUB option is selected', async () => {
@@ -15,7 +15,7 @@ describe('ExportPanel', () => {
     render(<ExportPanel onExport={onExport} />)
     fireEvent.click(screen.getByLabelText('EPUB'))
     fireEvent.click(screen.getByText('書き出し'))
-    await waitFor(() => expect(onExport).toHaveBeenCalledWith('epub'))
+    await waitFor(() => expect(onExport).toHaveBeenCalledWith('epub', expect.any(Function)))
   })
 
   it('shows a progress message while exporting, then a download link', async () => {

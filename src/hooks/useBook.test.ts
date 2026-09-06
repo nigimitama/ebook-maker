@@ -16,7 +16,7 @@ function blobOf(text: string, type: string): Blob {
 // (createImageBitmap / getImageData / toBlob) と実際のWorkerを必要とするが、
 // jsdomはどちらも提供しない。幅・高さ・RGBAバイト列を持つJSONという
 // 往復可能な単純「画像フォーマット」でfakeを用意し、fake-indexeddb上の
-// 本物の ImageStore に対して取り込み・結合・書き出しを通しで動かせるようにする。
+// 本物の ImageStore に対して読み込み・結合・書き出しを通しで動かせるようにする。
 // 結果の画素値もそのまま検証できる。
 interface FakeImageFile {
   w: number

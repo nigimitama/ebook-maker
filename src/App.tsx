@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useBook } from './hooks/useBook'
 import { ImportPanel } from './components/ImportPanel'
 import { PageList } from './components/PageList'
@@ -8,7 +8,7 @@ import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import type { PageEntry } from './types'
 
-const STEPS = ['取り込み', '並べ替え', '調整', '詳細＆書き出し'] as const
+const STEPS = ['読み込み', '並べ替え', '調整', '詳細＆書き出し'] as const
 
 interface PageFilmstripProps {
   pages: PageEntry[]
@@ -45,6 +45,14 @@ export function App() {
     setStep(next)
     setMaxStep((current) => Math.max(current, next))
   }
+
+  // 「調整」工程に入ったとき、まだ何も選ばれていなければ1ページ目を選ぶ。
+  useEffect(() => {
+    if (step !== 2) return
+    if (selectedPage) return
+    const first = book.pages[0]
+    if (first) void book.selectPage(first.id)
+  }, [step, selectedPage, book.pages, book.selectPage])
 
   return (
     <div className="app-shell">
@@ -92,6 +100,7 @@ export function App() {
                 onImport={book.importFiles}
                 pageCount={book.pages.length}
                 onClearAll={book.clearAllPages}
+                importProgress={book.importProgress}
               />
               <div className="nav-actions nav-actions--end">
                 <button

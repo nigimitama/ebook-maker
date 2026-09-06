@@ -15,6 +15,43 @@ interface PageListProps {
 // 「元に戻す」で取り消せる。
 const DELETE_UNDO_MS = 5000
 
+type SortMode = 'name-asc' | 'name-desc' | 'custom'
+
+function displayNameOf(page: PageEntry): string {
+  return page.fileName ?? `ページ ${page.order + 1}`
+}
+
+// localeCompare の numeric オプションは "." を "_" より後ろとして扱う(ICUの
+// デフォルト照合順序による、コードポイント順46<95とは逆の結果)ため、
+// "scan.jpg" が "scan_001.jpg" より後ろに来てしまう。Windowsエクスプローラーの
+// 自然順ソートに合わせるため、数字の並びだけを数値として比較する独自実装を使う。
+function compareNatural(a: string, b: string): number {
+  const chunksA = a.match(/\d+|\D+/g) ?? []
+  const chunksB = b.match(/\d+|\D+/g) ?? []
+  const len = Math.min(chunksA.length, chunksB.length)
+  for (let i = 0; i < len; i++) {
+    const chunkA = chunksA[i]
+    const chunkB = chunksB[i]
+    if (/^\d+$/.test(chunkA) && /^\d+$/.test(chunkB)) {
+      const diff = Number(chunkA) - Number(chunkB)
+      if (diff !== 0) return diff
+    } else if (chunkA !== chunkB) {
+      return chunkA < chunkB ? -1 : 1
+    }
+  }
+  return chunksA.length - chunksB.length
+}
+
+function sortIdsByName(pages: PageEntry[], direction: 'asc' | 'desc'): string[] {
+  const sorted = [...pages].sort((a, b) => compareNatural(displayNameOf(a), displayNameOf(b)))
+  if (direction === 'desc') sorted.reverse()
+  return sorted.map((p) => p.id)
+}
+
+function arraysEqual(a: string[], b: string[]): boolean {
+  return a.length === b.length && a.every((id, index) => id === b[index])
+}
+
 export function PageList({
   pages,
   thumbnails,
@@ -25,6 +62,8 @@ export function PageList({
   onConfirmMerge,
 }: PageListProps) {
   const draggedId = useRef<string | null>(null)
+  const [sortMode, setSortMode] = useState<SortMode>('name-asc')
+  const didInitialSort = useRef(false)
   const [mergeSelection, setMergeSelection] = useState<string[]>([])
   const [previewPageId, setPreviewPageId] = useState<string | null>(null)
   const [pendingDeleteIds, setPendingDeleteIds] = useState<string[]>([])
@@ -49,6 +88,25 @@ export function PageList({
     }
   }, [])
 
+  // ページ一覧を開いた最初の時点で、ファイル名昇順になっていなければ
+  // 一度だけ並べ替えて確定する。デフォルトの並び順として仕様が求めるため。
+  useEffect(() => {
+    if (didInitialSort.current || pages.length === 0) return
+    didInitialSort.current = true
+    const nameAsc = sortIdsByName(pages, 'asc')
+    if (!arraysEqual(
+      nameAsc,
+      pages.map((p) => p.id),
+    )) {
+      onReorder(nameAsc)
+    }
+  }, [pages, onReorder])
+
+  function sortByName(direction: 'asc' | 'desc') {
+    setSortMode(direction === 'asc' ? 'name-asc' : 'name-desc')
+    onReorder(sortIdsByName(pages, direction))
+  }
+
   function handleDrop(targetId: string) {
     const sourceId = draggedId.current
     draggedId.current = null
@@ -60,6 +118,7 @@ export function PageList({
     const targetIndexInFiltered = withoutSource.indexOf(targetId)
     const insertAt = sourceIndex < targetIndex ? targetIndexInFiltered + 1 : targetIndexInFiltered
     withoutSource.splice(insertAt, 0, sourceId)
+    setSortMode('custom')
     onReorder(withoutSource)
   }
 
@@ -111,6 +170,31 @@ export function PageList({
 
   return (
     <div className="panel">
+      <div className="page-list__sort" data-testid="sort-controls">
+        <span className="page-list__sort-label" data-testid="sort-status">
+          並び順:{' '}
+          {sortMode === 'name-asc'
+            ? 'ファイル名(昇順)'
+            : sortMode === 'name-desc'
+              ? 'ファイル名(降順)'
+              : '手動'}
+        </span>
+        <button
+          type="button"
+          className={sortMode === 'name-asc' ? 'btn-ghost page-row__merge--active' : 'btn-ghost'}
+          onClick={() => sortByName('asc')}
+        >
+          ファイル名昇順
+        </button>
+        <button
+          type="button"
+          className={sortMode === 'name-desc' ? 'btn-ghost page-row__merge--active' : 'btn-ghost'}
+          onClick={() => sortByName('desc')}
+        >
+          ファイル名降順
+        </button>
+      </div>
+
       {mergeSelection.length === 2 && (
         <div data-testid="merge-preview" className="merge-preview">
           <img src={thumbnails[mergeSelection[0]]} alt="left page" />

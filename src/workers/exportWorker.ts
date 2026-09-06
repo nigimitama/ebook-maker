@@ -34,7 +34,9 @@ async function decodeBlobViaCanvas(blob: Blob): Promise<RawImage> {
 
 self.onmessage = async (event: MessageEvent<ExportRequest>) => {
   try {
-    const bytes = await runExport(event.data, encodePngViaCanvas, decodeBlobViaCanvas)
+    const bytes = await runExport(event.data, encodePngViaCanvas, decodeBlobViaCanvas, (done, total) => {
+      ;(self as unknown as Worker).postMessage({ type: 'progress', done, total })
+    })
     ;(self as unknown as Worker).postMessage({ ok: true, bytes }, [bytes.buffer])
   } catch (error) {
     ;(self as unknown as Worker).postMessage({
