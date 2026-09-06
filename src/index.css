@@ -1,0 +1,223 @@
+:root {
+  --text: #1f2126;
+  --text-muted: #626873;
+  --bg: #ffffff;
+  --panel: #f6f7f9;
+  --border: #d7dae0;
+  --accent: #2f6fed;
+  --danger: #b3261e;
+  --danger-bg: #fdecea;
+
+  /* Keeps native widgets (range sliders, radios, scrollbars) themed to match
+     the palette below instead of staying light against a dark background. */
+  color-scheme: light dark;
+  font: 16px/1.5 system-ui, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #e6e8ec;
+    --text-muted: #a0a6b0;
+    --bg: #16181d;
+    --panel: #1f222a;
+    --border: #363b45;
+    --accent: #7aa2f7;
+    --danger: #ff8a80;
+    --danger-bg: #3a1d1a;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+/* Scans are thousands of pixels wide; without this every thumbnail and the
+   editor canvas render at natural size and blow out the page width. */
+img,
+canvas {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 16px;
+}
+
+h2 {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+p {
+  margin: 0 0 8px;
+}
+
+button {
+  font: inherit;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+  color: inherit;
+  cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+input[type='text'] {
+  font: inherit;
+  padding: 6px 8px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg);
+  color: inherit;
+}
+
+label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.app {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 16px 48px;
+}
+
+.app > * + * {
+  margin-top: 24px;
+}
+
+.panel {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+}
+
+.error-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--danger);
+  border-radius: 6px;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.dropzone {
+  border: 2px dashed var(--border);
+  border-radius: 6px;
+  padding: 24px 16px;
+  text-align: center;
+}
+
+.dropzone p {
+  color: var(--text-muted);
+}
+
+.page-list__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+}
+
+.page-list__item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 140px;
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+}
+
+.page-list__item--selected {
+  outline: 2px solid var(--accent);
+}
+
+.page-list__thumb {
+  width: 100%;
+  height: 140px;
+  object-fit: contain;
+  cursor: pointer;
+  background: var(--bg);
+}
+
+.merge-preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+}
+
+.merge-preview img {
+  max-height: 160px;
+  width: auto;
+}
+
+/* canvas is a replaced element: width/height auto plus both max-* bounds
+   scales a full-resolution scan down while keeping its aspect ratio. */
+.adjustment-editor__canvas {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 60vh;
+  margin: 0 auto;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--panel);
+}
+
+.adjustment-editor__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.metadata-form__fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.export-panel__formats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.export-panel__error {
+  color: var(--danger);
+}
