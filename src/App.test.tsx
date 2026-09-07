@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent } from '@testing-library/react'
 import { App } from './App'
 import * as useBookModule from './hooks/useBook'
 import type { UseBookResult } from './hooks/useBook'
@@ -125,5 +125,23 @@ describe('App', () => {
     fireEvent.click(screen.getByText('並べ替え・調整'))
     expect(screen.queryByText('見開き結合')).not.toBeInTheDocument()
     expect(screen.getByText('ファイルを選択')).toBeInTheDocument()
+  })
+
+  it('exposes an automation API on window.EbookMaker that reflects the current step and pages', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' }, selectedPageId: 'a' }),
+    )
+    render(<App />)
+
+    const state = window.EbookMaker?.getState()
+
+    expect(state?.step).toBe(0)
+    expect(state?.pages).toEqual([
+      { id: 'a', order: 0, fileName: undefined, width: 10, height: 10, adjustment: page.adjustment },
+    ])
+    expect(state?.selectedPageId).toBe('a')
+
+    act(() => window.EbookMaker?.goToStep(1))
+    expect(screen.getByText('見開き結合')).toBeInTheDocument()
   })
 })

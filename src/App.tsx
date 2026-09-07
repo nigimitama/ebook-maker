@@ -6,6 +6,7 @@ import { AdjustmentEditor } from './components/AdjustmentEditor'
 import { MetadataForm } from './components/MetadataForm'
 import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
+import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
 const STEPS = ['読み込み', '並べ替え・調整', '詳細＆書き出し'] as const
 
@@ -27,6 +28,39 @@ export function App() {
     const first = book.pages[0]
     if (first) void book.selectPage(first.id)
   }, [step, selectedPage, book.pages, book.selectPage])
+
+  // Claude Code等の外部エージェントがブラウザ越しにアプリを操作できるよう、
+  // window.EbookMaker としてAPIを公開する(詳細: window.EbookMaker.describe())。
+  useEffect(() => {
+    installAutomationApi({
+      getState: () => ({
+        step,
+        maxStep,
+        pages: book.pages.map(toAutomationPageSummary),
+        selectedPageId: book.selectedPageId,
+        metadata: book.metadata,
+        error: book.error,
+        importProgress: book.importProgress,
+        canUndoClearAll: book.canUndoClearAll,
+      }),
+      goToStep: goTo,
+      importFiles: book.importFiles,
+      selectPage: book.selectPage,
+      updateAdjustment: book.updateAdjustment,
+      applyResizeToAllPages: book.applyResizeToAllPages,
+      applyQualityToAllPages: book.applyQualityToAllPages,
+      applyToneToAllPages: book.applyToneToAllPages,
+      autoAdjustAllPages: book.autoAdjustAllPages,
+      reorderPages: book.reorderPages,
+      deletePage: book.deletePage,
+      clearAllPages: book.clearAllPages,
+      undoClearAll: book.undoClearAll,
+      confirmMerge: book.confirmMerge,
+      setMetadata: book.setMetadata,
+      exportBook: book.exportBook,
+      clearError: book.clearError,
+    })
+  })
 
   return (
     <div className="app-shell">
