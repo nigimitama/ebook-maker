@@ -8,6 +8,8 @@ interface AdjustmentEditorProps {
   adjustment: AdjustmentParams
   onAdjustmentChange: (params: AdjustmentParams) => void
   onApplyToAllPages: () => void
+  onAutoAdjustPage: () => void
+  onAutoAdjustAllPages: () => void
 }
 
 export function AdjustmentEditor({
@@ -15,6 +17,8 @@ export function AdjustmentEditor({
   adjustment,
   onAdjustmentChange,
   onApplyToAllPages,
+  onAutoAdjustPage,
+  onAutoAdjustAllPages,
 }: AdjustmentEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const resizeMode = adjustment.resizeMode ?? 'none'
@@ -45,34 +49,45 @@ export function AdjustmentEditor({
         className="adjustment-editor__canvas"
       />
       <div className="adjustment-editor__controls">
-        <label>
-          明るさ
-          <input
-            type="range"
-            min={-100}
-            max={100}
-            value={adjustment.brightness}
-            data-testid="brightness-slider"
-            onChange={(event) =>
-              onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
-            }
-          />
-          <span data-testid="brightness-value">{adjustment.brightness}</span>
-        </label>
-        <label>
-          コントラスト
-          <input
-            type="range"
-            min={-100}
-            max={100}
-            value={adjustment.contrast}
-            data-testid="contrast-slider"
-            onChange={(event) =>
-              onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
-            }
-          />
-          <span data-testid="contrast-value">{adjustment.contrast}</span>
-        </label>
+        <fieldset className="adjustment-editor__tone">
+          <legend>明るさ・コントラスト</legend>
+          <label>
+            明るさ
+            <input
+              type="range"
+              min={-100}
+              max={100}
+              value={adjustment.brightness}
+              data-testid="brightness-slider"
+              onChange={(event) =>
+                onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
+              }
+            />
+            <span data-testid="brightness-value">{adjustment.brightness}</span>
+          </label>
+          <label>
+            コントラスト
+            <input
+              type="range"
+              min={-100}
+              max={100}
+              value={adjustment.contrast}
+              data-testid="contrast-slider"
+              onChange={(event) =>
+                onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
+              }
+            />
+            <span data-testid="contrast-value">{adjustment.contrast}</span>
+          </label>
+          <div className="adjustment-editor__auto">
+            <button type="button" data-testid="auto-adjust-page" onClick={onAutoAdjustPage}>
+              このページを自動補正
+            </button>
+            <button type="button" data-testid="auto-adjust-all" onClick={onAutoAdjustAllPages}>
+              全ページを自動補正
+            </button>
+          </div>
+        </fieldset>
         <label>
           画質(JPEG品質)
           <input
@@ -142,11 +157,10 @@ export function AdjustmentEditor({
             />
             px
           </label>
+          <button type="button" onClick={onApplyToAllPages}>
+            リサイズ・画質を他のページにも適用
+          </button>
         </fieldset>
-
-        <button type="button" onClick={onApplyToAllPages}>
-          他のページにも適用
-        </button>
       </div>
     </div>
   )

@@ -502,6 +502,12 @@ label {
   gap: 16px;
 }
 
+.adjustment-editor__auto {
+  display: flex;
+  gap: 8px;
+}
+
+.adjustment-editor__tone,
 .adjustment-editor__resize {
   display: flex;
   flex-wrap: wrap;

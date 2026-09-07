@@ -112,6 +112,8 @@ export function App() {
                         adjustment={selectedPage.adjustment ?? DEFAULT_ADJUSTMENT}
                         onAdjustmentChange={(params) => book.updateAdjustment(selectedPage.id, params)}
                         onApplyToAllPages={() => book.applyAdjustmentToAllPages(selectedPage.id)}
+                        onAutoAdjustPage={() => book.autoAdjustPage(selectedPage.id)}
+                        onAutoAdjustAllPages={() => book.autoAdjustAllPages()}
                       />
                     ) : (
                       // 画素の準備が整うまでの繋ぎ。ここでエディタごと消すと、ページを

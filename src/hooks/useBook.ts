@@ -21,6 +21,8 @@ export interface UseBookResult {
   selectPage: (id: string) => Promise<void>
   updateAdjustment: (id: string, adjustment: AdjustmentParams) => Promise<void>
   applyAdjustmentToAllPages: (sourceId: string) => Promise<void>
+  autoAdjustPage: (id: string) => Promise<void>
+  autoAdjustAllPages: () => Promise<void>
   reorderPages: (orderedIds: string[]) => Promise<void>
   deletePage: (id: string) => Promise<void>
   clearAllPages: () => Promise<void>
@@ -325,6 +327,10 @@ export function useBook(): UseBookResult {
     pending.set(id, { timer, adjustment })
   }, [])
 
+  // リサイズ・画質だけを他のページにも複製する。明るさ・コントラストは
+  // ページごとに自動補正した値を持っているため、ここでは触れない
+  // (以前はここで明るさ・コントラストも含む調整値全体をコピーしており、
+  // リサイズを揃えるだけのつもりが他ページの補正値まで上書きしてしまっていた)。
   const applyAdjustmentToAllPages = useCallback(
     async (sourceId: string) => {
       const store = storeRef.current
@@ -332,14 +338,56 @@ export function useBook(): UseBookResult {
       await flushPendingAdjustments()
       const source = pages.find((p) => p.id === sourceId)
       if (!source) return
+      const { resizeMode, resizeWidth, resizeHeight, quality } = source.adjustment
       for (const page of pages) {
         if (page.id === sourceId) continue
-        await store.updateAdjustment(page.id, source.adjustment)
+        await store.updateAdjustment(page.id, {
+          ...page.adjustment,
+          resizeMode,
+          resizeWidth,
+          resizeHeight,
+          quality,
+        })
       }
       await refreshPages()
     },
     [pages, refreshPages, flushPendingAdjustments],
   )
+
+  // サムネイルから明るさ・コントラストを再計算する。リサイズ・画質など
+  // 他の調整値は変えない。
+  const autoAdjustPage = useCallback(
+    async (id: string) => {
+      const store = storeRef.current
+      if (!store) return
+      await flushPendingAdjustments()
+      const page = (await store.listPages()).find((p) => p.id === id)
+      if (!page?.thumbBlobId) return
+      const blob = await store.getBlob(page.thumbBlobId)
+      if (!blob) return
+      const raw = await decodeBlobToRawImage(blob)
+      const auto = computeAutoAdjustment(raw)
+      await store.updateAdjustment(id, { ...page.adjustment, ...auto })
+      await refreshPages()
+    },
+    [flushPendingAdjustments, refreshPages],
+  )
+
+  const autoAdjustAllPages = useCallback(async () => {
+    const store = storeRef.current
+    if (!store) return
+    await flushPendingAdjustments()
+    const currentPages = await store.listPages()
+    for (const page of currentPages) {
+      if (!page.thumbBlobId) continue
+      const blob = await store.getBlob(page.thumbBlobId)
+      if (!blob) continue
+      const raw = await decodeBlobToRawImage(blob)
+      const auto = computeAutoAdjustment(raw)
+      await store.updateAdjustment(page.id, { ...page.adjustment, ...auto })
+    }
+    await refreshPages()
+  }, [flushPendingAdjustments, refreshPages])
 
   const reorderPages = useCallback(
     async (orderedIds: string[]) => {
@@ -476,6 +524,8 @@ export function useBook(): UseBookResult {
     selectPage,
     updateAdjustment,
     applyAdjustmentToAllPages,
+    autoAdjustPage,
+    autoAdjustAllPages,
     reorderPages,
     deletePage,
     clearAllPages,

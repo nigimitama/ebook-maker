@@ -15,6 +15,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 15, contrast: -20 }}
         onAdjustmentChange={vi.fn()}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     expect(screen.getByTestId('brightness-slider')).toHaveValue('15')
@@ -29,6 +31,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 0, contrast: 5 }}
         onAdjustmentChange={onAdjustmentChange}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     fireEvent.change(screen.getByTestId('brightness-slider'), { target: { value: '30' } })
@@ -43,6 +47,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 10, contrast: 0 }}
         onAdjustmentChange={onAdjustmentChange}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     fireEvent.change(screen.getByTestId('contrast-slider'), { target: { value: '-40' } })
@@ -57,10 +63,44 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={vi.fn()}
         onApplyToAllPages={onApplyToAllPages}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
-    fireEvent.click(screen.getByText('他のページにも適用'))
+    fireEvent.click(screen.getByText('リサイズ・画質を他のページにも適用'))
     expect(onApplyToAllPages).toHaveBeenCalled()
+  })
+
+  it('calls onAutoAdjustPage when the per-page auto-adjust button is clicked', () => {
+    const onAutoAdjustPage = vi.fn()
+    render(
+      <AdjustmentEditor
+        image={image()}
+        adjustment={{ brightness: 0, contrast: 0 }}
+        onAdjustmentChange={vi.fn()}
+        onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={onAutoAdjustPage}
+        onAutoAdjustAllPages={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('auto-adjust-page'))
+    expect(onAutoAdjustPage).toHaveBeenCalled()
+  })
+
+  it('calls onAutoAdjustAllPages when the all-pages auto-adjust button is clicked', () => {
+    const onAutoAdjustAllPages = vi.fn()
+    render(
+      <AdjustmentEditor
+        image={image()}
+        adjustment={{ brightness: 0, contrast: 0 }}
+        onAdjustmentChange={vi.fn()}
+        onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={onAutoAdjustAllPages}
+      />,
+    )
+    fireEvent.click(screen.getByTestId('auto-adjust-all'))
+    expect(onAutoAdjustAllPages).toHaveBeenCalled()
   })
 
   it('defaults to no resize and a JPEG quality of 75 when unset', () => {
@@ -70,6 +110,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={vi.fn()}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     expect(screen.getByTestId('resize-mode-none')).toBeChecked()
@@ -86,6 +128,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={onAdjustmentChange}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     fireEvent.click(screen.getByTestId('resize-mode-width'))
@@ -102,6 +146,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 0, contrast: 0, resizeMode: 'height', resizeHeight: 1920 }}
         onAdjustmentChange={onAdjustmentChange}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     expect(screen.getByTestId('resize-mode-height')).toBeChecked()
@@ -119,6 +165,8 @@ describe('AdjustmentEditor', () => {
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={onAdjustmentChange}
         onApplyToAllPages={vi.fn()}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
       />,
     )
     fireEvent.change(screen.getByTestId('quality-slider'), { target: { value: '40' } })
