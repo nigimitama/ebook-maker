@@ -9,7 +9,7 @@ interface AdjustmentEditorProps {
   onAdjustmentChange: (params: AdjustmentParams) => void
   onApplyResizeToAllPages: () => void
   onApplyQualityToAllPages: () => void
-  onAutoAdjustPage: () => void
+  onApplyToneToAllPages: () => void
   onAutoAdjustAllPages: () => void
 }
 
@@ -19,7 +19,7 @@ export function AdjustmentEditor({
   onAdjustmentChange,
   onApplyResizeToAllPages,
   onApplyQualityToAllPages,
-  onAutoAdjustPage,
+  onApplyToneToAllPages,
   onAutoAdjustAllPages,
 }: AdjustmentEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -82,8 +82,8 @@ export function AdjustmentEditor({
             <span data-testid="contrast-value">{adjustment.contrast}</span>
           </label>
           <div className="adjustment-editor__auto">
-            <button type="button" data-testid="auto-adjust-page" onClick={onAutoAdjustPage}>
-              このページを自動補正
+            <button type="button" onClick={onApplyToneToAllPages}>
+              他のページにも適用
             </button>
             <button type="button" data-testid="auto-adjust-all" onClick={onAutoAdjustAllPages}>
               全ページを自動補正

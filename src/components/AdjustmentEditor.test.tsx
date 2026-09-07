@@ -16,7 +16,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={vi.fn()}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -33,7 +33,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={onAdjustmentChange}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -50,7 +50,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={onAdjustmentChange}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -67,7 +67,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={vi.fn()}
         onApplyResizeToAllPages={onApplyResizeToAllPages}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -84,7 +84,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={vi.fn()}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={onApplyQualityToAllPages}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -92,8 +92,8 @@ describe('AdjustmentEditor', () => {
     expect(onApplyQualityToAllPages).toHaveBeenCalled()
   })
 
-  it('calls onAutoAdjustPage when the per-page auto-adjust button is clicked', () => {
-    const onAutoAdjustPage = vi.fn()
+  it('calls onApplyToneToAllPages when the tone apply-to-all button is clicked', () => {
+    const onApplyToneToAllPages = vi.fn()
     render(
       <AdjustmentEditor
         image={image()}
@@ -101,12 +101,12 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={vi.fn()}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={onAutoAdjustPage}
+        onApplyToneToAllPages={onApplyToneToAllPages}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
-    fireEvent.click(screen.getByTestId('auto-adjust-page'))
-    expect(onAutoAdjustPage).toHaveBeenCalled()
+    fireEvent.click(screen.getByText('他のページにも適用'))
+    expect(onApplyToneToAllPages).toHaveBeenCalled()
   })
 
   it('calls onAutoAdjustAllPages when the all-pages auto-adjust button is clicked', () => {
@@ -118,7 +118,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={vi.fn()}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={onAutoAdjustAllPages}
       />,
     )
@@ -134,7 +134,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={vi.fn()}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -153,7 +153,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={onAdjustmentChange}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -172,7 +172,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={onAdjustmentChange}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
@@ -192,7 +192,7 @@ describe('AdjustmentEditor', () => {
         onAdjustmentChange={onAdjustmentChange}
         onApplyResizeToAllPages={vi.fn()}
         onApplyQualityToAllPages={vi.fn()}
-        onAutoAdjustPage={vi.fn()}
+        onApplyToneToAllPages={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )

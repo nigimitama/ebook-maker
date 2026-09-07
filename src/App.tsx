@@ -113,7 +113,7 @@ export function App() {
                         onAdjustmentChange={(params) => book.updateAdjustment(selectedPage.id, params)}
                         onApplyResizeToAllPages={() => book.applyResizeToAllPages(selectedPage.id)}
                         onApplyQualityToAllPages={() => book.applyQualityToAllPages(selectedPage.id)}
-                        onAutoAdjustPage={() => book.autoAdjustPage(selectedPage.id)}
+                        onApplyToneToAllPages={() => book.applyToneToAllPages(selectedPage.id)}
                         onAutoAdjustAllPages={() => book.autoAdjustAllPages()}
                       />
                     ) : (

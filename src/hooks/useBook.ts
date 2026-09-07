@@ -22,7 +22,7 @@ export interface UseBookResult {
   updateAdjustment: (id: string, adjustment: AdjustmentParams) => Promise<void>
   applyResizeToAllPages: (sourceId: string) => Promise<void>
   applyQualityToAllPages: (sourceId: string) => Promise<void>
-  autoAdjustPage: (id: string) => Promise<void>
+  applyToneToAllPages: (sourceId: string) => Promise<void>
   autoAdjustAllPages: () => Promise<void>
   reorderPages: (orderedIds: string[]) => Promise<void>
   deletePage: (id: string) => Promise<void>
@@ -367,23 +367,22 @@ export function useBook(): UseBookResult {
     [pages, refreshPages, flushPendingAdjustments],
   )
 
-  // サムネイルから明るさ・コントラストを再計算する。リサイズ・画質など
-  // 他の調整値は変えない。
-  const autoAdjustPage = useCallback(
-    async (id: string) => {
+  // 明るさ・コントラストだけを他のページにも複製する。
+  const applyToneToAllPages = useCallback(
+    async (sourceId: string) => {
       const store = storeRef.current
       if (!store) return
       await flushPendingAdjustments()
-      const page = (await store.listPages()).find((p) => p.id === id)
-      if (!page?.thumbBlobId) return
-      const blob = await store.getBlob(page.thumbBlobId)
-      if (!blob) return
-      const raw = await decodeBlobToRawImage(blob)
-      const auto = computeAutoAdjustment(raw)
-      await store.updateAdjustment(id, { ...page.adjustment, ...auto })
+      const source = pages.find((p) => p.id === sourceId)
+      if (!source) return
+      const { brightness, contrast } = source.adjustment
+      for (const page of pages) {
+        if (page.id === sourceId) continue
+        await store.updateAdjustment(page.id, { ...page.adjustment, brightness, contrast })
+      }
       await refreshPages()
     },
-    [flushPendingAdjustments, refreshPages],
+    [pages, refreshPages, flushPendingAdjustments],
   )
 
   const autoAdjustAllPages = useCallback(async () => {
@@ -538,7 +537,7 @@ export function useBook(): UseBookResult {
     updateAdjustment,
     applyResizeToAllPages,
     applyQualityToAllPages,
-    autoAdjustPage,
+    applyToneToAllPages,
     autoAdjustAllPages,
     reorderPages,
     deletePage,
