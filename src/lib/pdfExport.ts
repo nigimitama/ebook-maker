@@ -2,7 +2,7 @@ import { PDFDocument } from 'pdf-lib'
 import type { BookMetadata } from '../types'
 
 export interface ExportPage {
-  png: Uint8Array
+  jpeg: Uint8Array
   width: number
   height: number
 }
@@ -13,7 +13,7 @@ export async function buildPdf(pages: ExportPage[], metadata: BookMetadata): Pro
   if (metadata.author) doc.setAuthor(metadata.author)
 
   for (const page of pages) {
-    const image = await doc.embedPng(page.png)
+    const image = await doc.embedJpg(page.jpeg)
     const pdfPage = doc.addPage([page.width, page.height])
     pdfPage.drawImage(image, { x: 0, y: 0, width: page.width, height: page.height })
   }

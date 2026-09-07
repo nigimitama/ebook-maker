@@ -45,4 +45,37 @@ describe('applyAdjustment', () => {
     expect(out.data[3]).toBe(255)
     expect(Array.from(input.data)).toEqual(Array.from(inputCopy))
   })
+
+  it('leaves the size unchanged when resizeMode is missing or none', () => {
+    const image = gray(100, 4, 2)
+    expect(applyAdjustment(image, { brightness: 0, contrast: 0 }).width).toBe(4)
+    expect(
+      applyAdjustment(image, { brightness: 0, contrast: 0, resizeMode: 'none' }).height,
+    ).toBe(2)
+  })
+
+  it('resizes to the requested width, preserving aspect ratio', () => {
+    const image = gray(100, 4, 2)
+    const out = applyAdjustment(image, { brightness: 0, contrast: 0, resizeMode: 'width', resizeWidth: 8 })
+    expect(out.width).toBe(8)
+    expect(out.height).toBe(4)
+  })
+
+  it('resizes to the requested height, preserving aspect ratio', () => {
+    const image = gray(100, 4, 2)
+    const out = applyAdjustment(image, {
+      brightness: 0,
+      contrast: 0,
+      resizeMode: 'height',
+      resizeHeight: 8,
+    })
+    expect(out.height).toBe(8)
+    expect(out.width).toBe(16)
+  })
+
+  it('falls back to the default target size when resizeWidth/resizeHeight are missing', () => {
+    const image = gray(100, 1080, 1920)
+    const out = applyAdjustment(image, { brightness: 0, contrast: 0, resizeMode: 'width' })
+    expect(out.width).toBe(1080)
+  })
 })

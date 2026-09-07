@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import { PDFDocument } from 'pdf-lib'
 import { buildPdf } from './pdfExport'
-import { decodeBase64Png } from '../test/pngFixture'
+import { decodeBase64Jpeg } from '../test/jpegFixture'
 
 describe('buildPdf', () => {
   it('builds a PDF with one page per input image and embeds metadata', async () => {
-    const png = decodeBase64Png()
+    const jpeg = decodeBase64Jpeg()
     const pages = [
-      { png, width: 2, height: 1 },
-      { png, width: 2, height: 1 },
+      { jpeg, width: 2, height: 1 },
+      { jpeg, width: 2, height: 1 },
     ]
     const bytes = await buildPdf(pages, { title: 'My Book', author: 'Someone' })
     expect(new TextDecoder().decode(bytes.slice(0, 5))).toBe('%PDF-')

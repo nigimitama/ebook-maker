@@ -42,7 +42,7 @@ function pageXhtml(n: number, width: number, height: number): string {
   <meta name="viewport" content="width=${width}, height=${height}"/>
 </head>
 <body style="margin:0;padding:0">
-  <img src="../images/page-${n}.png" width="${width}" height="${height}" alt="page ${n}"/>
+  <img src="../images/page-${n}.jpg" width="${width}" height="${height}" alt="page ${n}"/>
 </body>
 </html>
 `
@@ -86,10 +86,10 @@ export async function buildEpub(pages: ExportPage[], metadata: BookMetadata): Pr
 
   pages.forEach((page, index) => {
     const n = index + 1
-    images.file(`page-${n}.png`, page.png)
+    images.file(`page-${n}.jpg`, page.jpeg)
     text.file(`page-${n}.xhtml`, pageXhtml(n, page.width, page.height))
     manifestItems.push(
-      `<item id="img${n}" href="images/page-${n}.png" media-type="image/png"/>`,
+      `<item id="img${n}" href="images/page-${n}.jpg" media-type="image/jpeg"/>`,
     )
     manifestItems.push(
       `<item id="page${n}" href="text/page-${n}.xhtml" media-type="application/xhtml+xml"/>`,

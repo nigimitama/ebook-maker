@@ -1,6 +1,7 @@
 import { applyAdjustment } from '../lib/applyAdjustment'
 import { buildPdf, type ExportPage } from '../lib/pdfExport'
 import { buildEpub } from '../lib/epubExport'
+import { DEFAULT_JPEG_QUALITY } from '../types'
 import type { AdjustmentParams, BookMetadata, RawImage } from '../types'
 
 // ページはデコード済みRGBA画素ではなく、原本のBlobと調整パラメータの形で
@@ -19,13 +20,13 @@ export interface ExportRequest {
   pages: ExportRequestPage[]
 }
 
-export type PngEncoder = (image: RawImage) => Promise<Uint8Array>
+export type JpegEncoder = (image: RawImage, quality: number) => Promise<Uint8Array>
 export type BlobDecoder = (blob: Blob) => Promise<RawImage>
 export type ExportProgress = (done: number, total: number) => void
 
 export async function runExport(
   request: ExportRequest,
-  encodePng: PngEncoder,
+  encodeJpeg: JpegEncoder,
   decodeBlob: BlobDecoder,
   onProgress?: ExportProgress,
 ): Promise<Uint8Array> {
@@ -34,8 +35,9 @@ export async function runExport(
   for (const [index, page] of request.pages.entries()) {
     const decoded = await decodeBlob(page.blob)
     const adjusted = applyAdjustment(decoded, page.adjustment)
-    const png = await encodePng(adjusted)
-    exportPages.push({ png, width: adjusted.width, height: adjusted.height })
+    const quality = page.adjustment.quality ?? DEFAULT_JPEG_QUALITY
+    const jpeg = await encodeJpeg(adjusted, quality)
+    exportPages.push({ jpeg, width: adjusted.width, height: adjusted.height })
     onProgress?.(index + 1, total)
   }
   return request.format === 'pdf'
