@@ -152,7 +152,7 @@ label {
 }
 
 .app-shell {
-  max-width: 960px;
+  max-width: 1280px;
   margin: 0 auto;
   padding: 32px 16px 48px;
 }
@@ -318,26 +318,22 @@ label {
   font-weight: normal;
 }
 
-/* — 調整工程の簡易フィルムストリップ(どのページを編集するかの選択だけを担う。
-   並べ替え・削除・結合は並べ替え工程の PageList が担当する) — */
-.filmstrip {
+/* — 並べ替え・調整工程: 左に PageList、右にプレビュー(AdjustmentEditor) を並べる — */
+.page-adjust-layout {
   display: flex;
-  gap: 8px;
-  overflow-x: auto;
+  align-items: flex-start;
+  gap: 16px;
 }
 
-.filmstrip__thumb {
-  width: 56px;
-  height: 72px;
+.page-adjust-layout__list {
+  flex: 1;
+  min-width: 320px;
+}
+
+.page-adjust-layout__preview {
+  width: 320px;
   flex: none;
-  object-fit: cover;
-  cursor: pointer;
-  border: 1px solid var(--color-divider);
-  background: var(--color-surface);
-}
-
-.filmstrip__thumb--selected {
-  border: 2px solid var(--color-accent);
+  min-width: 0;
 }
 
 .page-list__sort {
@@ -370,6 +366,7 @@ label {
   padding: 10px 6px;
   border-bottom: 1px solid var(--color-divider);
   border-left: 3px solid transparent;
+  cursor: pointer;
 }
 
 .page-row--selected {
@@ -410,6 +407,16 @@ label {
   font-size: 14px;
 }
 
+.page-row__resize-badge {
+  margin-left: 8px;
+  padding: 1px 6px;
+  border: 1px solid var(--color-divider);
+  border-radius: 3px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
 .page-row__actions {
   flex: none;
   display: flex;
@@ -447,7 +454,8 @@ label {
   background: var(--color-bg);
 }
 
-.thumb-modal__frame img {
+.thumb-modal__frame img,
+.thumb-modal__canvas {
   max-width: 100%;
   max-height: 75vh;
   width: auto;

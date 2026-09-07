@@ -46,7 +46,7 @@ describe('App', () => {
     expect(screen.getByText('次へ')).toBeDisabled()
   })
 
-  it('advances to the 並べ替え step and shows the page list and merge action', () => {
+  it('advances to the 並べ替え・調整 step and shows the page list and merge action', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
@@ -61,12 +61,11 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
-    fireEvent.click(screen.getByText('調整へ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
   })
 
-  it('shows the AdjustmentEditor on the 調整 step once a page is selected and its image is loaded', () => {
+  it('shows the AdjustmentEditor on the 並べ替え・調整 step once a page is selected and its image is loaded', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({
         pages: [{ ...page, adjustment: { brightness: 5, contrast: 0 } }],
@@ -77,7 +76,6 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
-    fireEvent.click(screen.getByText('調整へ進む'))
     expect(screen.getByTestId('brightness-slider')).toHaveValue('5')
   })
 
@@ -93,17 +91,15 @@ describe('App', () => {
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
-    fireEvent.click(screen.getByText('調整へ進む'))
     expect(screen.getByTestId('preview-loading')).toBeInTheDocument()
     expect(screen.queryByTestId('adjustment-canvas')).not.toBeInTheDocument()
   })
 
-  it('selects the first page automatically on entering the 調整 step', () => {
+  it('selects the first page automatically on entering the 並べ替え・調整 step', () => {
     const props = mockBook({ pages: [page], thumbnails: { a: 'blob:a' } })
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(props)
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
-    fireEvent.click(screen.getByText('調整へ進む'))
     expect(props.selectPage).toHaveBeenCalledWith('a')
   })
 
@@ -121,7 +117,7 @@ describe('App', () => {
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
-    fireEvent.click(screen.getByText('並べ替え'))
+    fireEvent.click(screen.getByText('並べ替え・調整'))
     expect(screen.queryByText('見開き結合')).not.toBeInTheDocument()
     expect(screen.getByText('ファイルを選択')).toBeInTheDocument()
   })

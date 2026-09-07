@@ -1,10 +1,58 @@
 import { useEffect, useRef, useState } from 'react'
-import type { PageEntry } from '../types'
+import type { CSSProperties } from 'react'
+import { applyAdjustment } from '../lib/applyAdjustment'
+import type { AdjustmentParams, PageEntry, RawImage } from '../types'
+
+// サムネイルは無加工の原本(thumbBlobId)なので、一覧でも調整の効果が一目で
+// わかるようCSSフィルタで近似表示する。書き出し時のピクセル演算(applyAdjustment)
+// とは別物で、あくまで見た目のプレビュー用。
+function adjustmentPreviewStyle(adjustment: AdjustmentParams): CSSProperties {
+  const contrastFactor = (100 + adjustment.contrast) / 100
+  const brightnessFactor = 1 + adjustment.brightness / 100
+  return { filter: `contrast(${contrastFactor}) brightness(${brightnessFactor})` }
+}
+
+interface AdjustedPreviewProps {
+  image: RawImage
+  adjustment: AdjustmentParams
+}
+
+// 拡大表示は原本の画素に実際の調整(明るさ・コントラスト・リサイズ)を
+// 適用した結果を見せる。書き出し結果に一番近いプレビューにするため。
+function AdjustedPreview({ image, adjustment }: AdjustedPreviewProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    const ctx = canvas?.getContext('2d')
+    if (!canvas || !ctx) return
+    const preview = applyAdjustment(image, adjustment)
+    canvas.width = preview.width
+    canvas.height = preview.height
+    const imageData = new ImageData(new Uint8ClampedArray(preview.data), preview.width, preview.height)
+    ctx.putImageData(imageData, 0, 0)
+  }, [image, adjustment])
+
+  return <canvas ref={canvasRef} data-testid="thumb-modal-canvas" className="thumb-modal__canvas" />
+}
+
+function resizeLabel(adjustment: AdjustmentParams): string | null {
+  if (!adjustment.resizeMode || adjustment.resizeMode === 'none') return null
+  if (adjustment.resizeMode === 'width' && adjustment.resizeWidth) {
+    return `幅 ${adjustment.resizeWidth}px`
+  }
+  if (adjustment.resizeMode === 'height' && adjustment.resizeHeight) {
+    return `高さ ${adjustment.resizeHeight}px`
+  }
+  return null
+}
 
 interface PageListProps {
   pages: PageEntry[]
   thumbnails: Record<string, string>
   selectedPageId: string | null
+  // 拡大表示(調整反映プレビュー)用。選択中ページの画素がまだ届いていなければ null。
+  selectedImage: RawImage | null
   onSelect: (id: string) => void
   onReorder: (orderedIds: string[]) => void
   onDelete: (id: string) => void
@@ -56,6 +104,7 @@ export function PageList({
   pages,
   thumbnails,
   selectedPageId,
+  selectedImage,
   onSelect,
   onReorder,
   onDelete,
@@ -230,6 +279,9 @@ export function PageList({
               }}
               onDragOver={(event) => event.preventDefault()}
               onDrop={() => handleDrop(page.id)}
+              onClick={() => {
+                if (!isPendingDelete) onSelect(page.id)
+              }}
             >
               {isPendingDelete ? (
                 <>
@@ -253,10 +305,16 @@ export function PageList({
                       src={thumbnails[page.id]}
                       alt={`page ${page.order + 1}`}
                       className="page-list__thumb"
+                      style={adjustmentPreviewStyle(page.adjustment)}
                     />
                   </button>
                   <span className="page-row__name" title={displayName}>
                     {displayName}
+                    {resizeLabel(page.adjustment) && (
+                      <span className="page-row__resize-badge" data-testid={`resize-badge-${page.id}`}>
+                        {resizeLabel(page.adjustment)}
+                      </span>
+                    )}
                   </span>
                   <div className="page-row__actions">
                     <button
@@ -291,7 +349,11 @@ export function PageList({
           onClick={() => setPreviewPageId(null)}
         >
           <div className="thumb-modal__frame" onClick={(event) => event.stopPropagation()}>
-            <img src={thumbnails[previewPage.id]} alt={`page ${previewPage.order + 1} preview`} />
+            {previewPage.id === selectedPageId && selectedImage ? (
+              <AdjustedPreview image={selectedImage} adjustment={previewPage.adjustment} />
+            ) : (
+              <img src={thumbnails[previewPage.id]} alt={`page ${previewPage.order + 1} preview`} />
+            )}
             <button
               type="button"
               className="thumb-modal__close"
