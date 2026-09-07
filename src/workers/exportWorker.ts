@@ -5,14 +5,16 @@ import { runExport } from './exportCore'
 import type { ExportRequest } from './exportCore'
 import type { RawImage } from '../types'
 
-function encodePngViaCanvas(image: RawImage): Promise<Uint8Array> {
+function encodeJpegViaCanvas(image: RawImage, quality: number): Promise<Uint8Array> {
   const canvas = new OffscreenCanvas(image.width, image.height)
   const ctx = canvas.getContext('2d')
   if (!ctx) return Promise.reject(new Error('OffscreenCanvas 2D context unavailable'))
   ctx.putImageData(new ImageData(new Uint8ClampedArray(image.data), image.width, image.height), 0, 0)
-  return canvas.convertToBlob({ type: 'image/png' }).then(async (blob) => {
-    return new Uint8Array(await blob.arrayBuffer())
-  })
+  return canvas
+    .convertToBlob({ type: 'image/jpeg', quality: Math.min(100, Math.max(1, quality)) / 100 })
+    .then(async (blob) => {
+      return new Uint8Array(await blob.arrayBuffer())
+    })
 }
 
 // src/lib/decodeImage.ts と同じ処理を、DOMの<canvas>ではなく
@@ -34,7 +36,7 @@ async function decodeBlobViaCanvas(blob: Blob): Promise<RawImage> {
 
 self.onmessage = async (event: MessageEvent<ExportRequest>) => {
   try {
-    const bytes = await runExport(event.data, encodePngViaCanvas, decodeBlobViaCanvas, (done, total) => {
+    const bytes = await runExport(event.data, encodeJpegViaCanvas, decodeBlobViaCanvas, (done, total) => {
       ;(self as unknown as Worker).postMessage({ type: 'progress', done, total })
     })
     ;(self as unknown as Worker).postMessage({ ok: true, bytes }, [bytes.buffer])

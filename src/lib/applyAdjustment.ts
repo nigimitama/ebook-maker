@@ -1,4 +1,6 @@
+import { DEFAULT_RESIZE_HEIGHT, DEFAULT_RESIZE_WIDTH } from '../types'
 import type { AdjustmentParams, RawImage } from '../types'
+import { computeTargetSize, resizeImage } from './resizeImage'
 
 export function applyAdjustment(image: RawImage, params: AdjustmentParams): RawImage {
   const factor = (100 + params.contrast) / 100
@@ -10,5 +12,17 @@ export function applyAdjustment(image: RawImage, params: AdjustmentParams): RawI
     out[i + 2] = (src[i + 2] - 128) * factor + 128 + params.brightness
     out[i + 3] = src[i + 3]
   }
-  return { data: out, width: image.width, height: image.height }
+  const colorAdjusted: RawImage = { data: out, width: image.width, height: image.height }
+
+  const resizeMode = params.resizeMode ?? 'none'
+  if (resizeMode === 'none') return colorAdjusted
+
+  const target = computeTargetSize(
+    colorAdjusted.width,
+    colorAdjusted.height,
+    resizeMode,
+    params.resizeWidth ?? DEFAULT_RESIZE_WIDTH,
+    params.resizeHeight ?? DEFAULT_RESIZE_HEIGHT,
+  )
+  return resizeImage(colorAdjusted, target.width, target.height)
 }

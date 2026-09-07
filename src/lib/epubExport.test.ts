@@ -1,14 +1,14 @@
 import { describe, it, expect } from 'vitest'
 import JSZip from 'jszip'
 import { buildEpub } from './epubExport'
-import { decodeBase64Png } from '../test/pngFixture'
+import { decodeBase64Jpeg } from '../test/jpegFixture'
 
 describe('buildEpub', () => {
   it('produces a valid EPUB3 package with one xhtml+image pair per page', async () => {
-    const png = decodeBase64Png()
+    const jpeg = decodeBase64Jpeg()
     const pages = [
-      { png, width: 2, height: 1 },
-      { png, width: 2, height: 1 },
+      { jpeg, width: 2, height: 1 },
+      { jpeg, width: 2, height: 1 },
     ]
     const bytes = await buildEpub(pages, { title: 'My Book', author: 'Someone' })
     const zip = await JSZip.loadAsync(bytes)
@@ -31,8 +31,8 @@ describe('buildEpub', () => {
     expect(opf).toMatch(/dcterms:modified">\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z</)
     expect(opf.match(/property="dcterms:modified"/g)).toHaveLength(1)
 
-    expect(zip.file('OEBPS/images/page-1.png')).not.toBeNull()
-    expect(zip.file('OEBPS/images/page-2.png')).not.toBeNull()
+    expect(zip.file('OEBPS/images/page-1.jpg')).not.toBeNull()
+    expect(zip.file('OEBPS/images/page-2.jpg')).not.toBeNull()
     expect(zip.file('OEBPS/text/page-1.xhtml')).not.toBeNull()
     expect(zip.file('OEBPS/text/page-2.xhtml')).not.toBeNull()
 
@@ -45,8 +45,8 @@ describe('buildEpub', () => {
   })
 
   it('escapes XML-unsafe characters in metadata', async () => {
-    const png = decodeBase64Png()
-    const bytes = await buildEpub([{ png, width: 2, height: 1 }], {
+    const jpeg = decodeBase64Jpeg()
+    const bytes = await buildEpub([{ jpeg, width: 2, height: 1 }], {
       title: 'A & B <Title>',
       author: 'X',
     })

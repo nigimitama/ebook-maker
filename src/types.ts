@@ -1,9 +1,24 @@
+// 'none': リサイズしない。'width'/'height': 縦横比を保ったまま指定辺を揃える。
+export type ResizeMode = 'none' | 'width' | 'height'
+
 export interface AdjustmentParams {
   brightness: number // -100..100、0で変化なし
   contrast: number // -100..100、0で変化なし
+  // リサイズ機能の追加前に保存された調整値は持たないため任意。
+  // 未指定は resizeMode==='none' 相当として扱う。
+  resizeMode?: ResizeMode
+  resizeWidth?: number
+  resizeHeight?: number
+  // 書き出し時のJPEG品質(1..100)。品質選択の追加前に保存された調整値は
+  // 持たないため任意。未指定は DEFAULT_JPEG_QUALITY 相当として扱う。
+  quality?: number
 }
 
 export const DEFAULT_ADJUSTMENT: AdjustmentParams = { brightness: 0, contrast: 0 }
+
+export const DEFAULT_RESIZE_WIDTH = 1080
+export const DEFAULT_RESIZE_HEIGHT = 1920
+export const DEFAULT_JPEG_QUALITY = 75
 
 export interface PageEntry {
   id: string
