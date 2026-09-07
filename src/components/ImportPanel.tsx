@@ -5,6 +5,8 @@ interface ImportPanelProps {
   onImport: (files: File[]) => void
   pageCount?: number
   onClearAll?: () => void
+  canUndoClearAll?: boolean
+  onUndoClearAll?: () => void
   importProgress?: { done: number; total: number } | null
 }
 
@@ -75,7 +77,14 @@ async function filesFromDataTransfer(dataTransfer: DataTransfer): Promise<File[]
   return files.flat()
 }
 
-export function ImportPanel({ onImport, pageCount = 0, onClearAll, importProgress }: ImportPanelProps) {
+export function ImportPanel({
+  onImport,
+  pageCount = 0,
+  onClearAll,
+  canUndoClearAll = false,
+  onUndoClearAll,
+  importProgress,
+}: ImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
 
@@ -116,13 +125,23 @@ export function ImportPanel({ onImport, pageCount = 0, onClearAll, importProgres
               type="button"
               className="import-count__clear"
               data-testid="clear-all-button"
-              onClick={() => {
-                if (window.confirm('登録済みのファイルをすべて登録解除しますか？')) onClearAll()
-              }}
+              onClick={() => onClearAll()}
             >
               すべて登録解除
             </button>
           )}
+        </p>
+      )}
+      {canUndoClearAll && onUndoClearAll && (
+        <p className="import-count" data-testid="undo-clear-all">
+          <button
+            type="button"
+            className="import-count__undo"
+            data-testid="undo-clear-all-button"
+            onClick={() => onUndoClearAll()}
+          >
+            もとに戻す
+          </button>
         </p>
       )}
       <button type="button" onClick={() => fileInputRef.current?.click()}>

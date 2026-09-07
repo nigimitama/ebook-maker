@@ -27,6 +27,8 @@ export interface UseBookResult {
   reorderPages: (orderedIds: string[]) => Promise<void>
   deletePage: (id: string) => Promise<void>
   clearAllPages: () => Promise<void>
+  canUndoClearAll: boolean
+  undoClearAll: () => Promise<void>
   confirmMerge: (firstId: string, secondId: string) => Promise<void>
   setMetadata: (metadata: BookMetadata) => void
   exportBook: (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => Promise<Blob>
@@ -69,6 +71,8 @@ export function useBook(): UseBookResult {
   const [selectedImage, setSelectedImage] = useState<RawImage | null>(null)
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [canUndoClearAll, setCanUndoClearAll] = useState(false)
+  const clearAllSnapshotRef = useRef<{ pages: PageEntry[]; blobs: [string, Blob][] } | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -276,6 +280,9 @@ export function useBook(): UseBookResult {
             setThumbnails((current) => ({ ...current, [page.id]: URL.createObjectURL(thumbBlob) }))
           }
           if (!firstNewId) firstNewId = page.id
+          // 新しくページが登録されたので、直前の「すべて登録解除」の取り消しはもう使えない。
+          clearAllSnapshotRef.current = null
+          setCanUndoClearAll(false)
         } catch (fileError) {
           if (isQuotaExceeded(fileError)) quotaExceeded = true
           failedNames.push(file.name)
@@ -439,7 +446,21 @@ export function useBook(): UseBookResult {
     for (const entry of pendingAdjustmentsRef.current.values()) clearTimeout(entry.timer)
     pendingAdjustmentsRef.current.clear()
     rawImagesRef.current.clear()
+    // 取り消し操作のために、消す前のページとBlobをすべて退避しておく。
+    const snapshotPages = await store.listPages()
+    const blobIds = new Set<string>()
+    for (const page of snapshotPages) {
+      blobIds.add(page.blobId)
+      if (page.thumbBlobId) blobIds.add(page.thumbBlobId)
+    }
+    const snapshotBlobs: [string, Blob][] = []
+    for (const blobId of blobIds) {
+      const blob = await store.getBlob(blobId)
+      if (blob) snapshotBlobs.push([blobId, blob])
+    }
     await store.clearAll()
+    clearAllSnapshotRef.current = { pages: snapshotPages, blobs: snapshotBlobs }
+    setCanUndoClearAll(snapshotPages.length > 0)
     setThumbnails((current) => {
       for (const url of Object.values(current)) URL.revokeObjectURL(url)
       return {}
@@ -448,6 +469,23 @@ export function useBook(): UseBookResult {
     setSelectedImage(null)
     await refreshPages()
   }, [refreshPages, setSelected])
+
+  const undoClearAll = useCallback(async () => {
+    const store = storeRef.current
+    const snapshot = clearAllSnapshotRef.current
+    if (!store || !snapshot) return
+    await store.restorePages(snapshot.pages, snapshot.blobs)
+    clearAllSnapshotRef.current = null
+    setCanUndoClearAll(false)
+    const restoredThumbnails: Record<string, string> = {}
+    for (const page of snapshot.pages) {
+      if (!page.thumbBlobId) continue
+      const blob = await store.getBlob(page.thumbBlobId)
+      if (blob) restoredThumbnails[page.id] = URL.createObjectURL(blob)
+    }
+    setThumbnails(restoredThumbnails)
+    await refreshPages()
+  }, [refreshPages])
 
   const confirmMerge = useCallback(
     async (firstId: string, secondId: string) => {
@@ -542,6 +580,8 @@ export function useBook(): UseBookResult {
     reorderPages,
     deletePage,
     clearAllPages,
+    canUndoClearAll,
+    undoClearAll,
     confirmMerge,
     setMetadata,
     exportBook,
