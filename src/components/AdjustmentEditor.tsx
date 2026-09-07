@@ -57,6 +57,7 @@ export function AdjustmentEditor({
               onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
             }
           />
+          <span data-testid="brightness-value">{adjustment.brightness}</span>
         </label>
         <label>
           コントラスト
@@ -70,6 +71,7 @@ export function AdjustmentEditor({
               onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
             }
           />
+          <span data-testid="contrast-value">{adjustment.contrast}</span>
         </label>
         <label>
           画質(JPEG品質)
