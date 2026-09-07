@@ -53,9 +53,8 @@ function toneLabel(adjustment: AdjustmentParams): string | null {
   return `明るさ${adjustment.brightness} コントラスト${adjustment.contrast}`
 }
 
-function qualityLabel(adjustment: AdjustmentParams): string | null {
+function qualityLabel(adjustment: AdjustmentParams): string {
   const quality = adjustment.quality ?? DEFAULT_JPEG_QUALITY
-  if (quality === DEFAULT_JPEG_QUALITY) return null
   return `画質 ${quality}`
 }
 
@@ -335,11 +334,16 @@ export function PageList({
                           {resizeLabel(page.adjustment)}
                         </span>
                       )}
-                      {qualityLabel(page.adjustment) && (
-                        <span className="page-row__quality-badge" data-testid={`quality-badge-${page.id}`}>
-                          {qualityLabel(page.adjustment)}
-                        </span>
-                      )}
+                      <span
+                        className={
+                          (page.adjustment.quality ?? DEFAULT_JPEG_QUALITY) === DEFAULT_JPEG_QUALITY
+                            ? 'page-row__quality-badge page-row__quality-badge--default'
+                            : 'page-row__quality-badge'
+                        }
+                        data-testid={`quality-badge-${page.id}`}
+                      >
+                        {qualityLabel(page.adjustment)}
+                      </span>
                     </span>
                   </span>
                   <div className="page-row__actions">
