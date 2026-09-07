@@ -23,6 +23,7 @@ function baseProps() {
     pages,
     thumbnails,
     selectedPageId: null as string | null,
+    selectedImage: null,
     onSelect: vi.fn(),
     onReorder: vi.fn(),
     onDelete: vi.fn(),

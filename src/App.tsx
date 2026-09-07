@@ -97,6 +97,7 @@ export function App() {
                     pages={book.pages}
                     thumbnails={book.thumbnails}
                     selectedPageId={book.selectedPageId}
+                    selectedImage={book.selectedImage}
                     onSelect={book.selectPage}
                     onReorder={book.reorderPages}
                     onDelete={book.deletePage}

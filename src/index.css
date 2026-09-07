@@ -454,7 +454,8 @@ label {
   background: var(--color-bg);
 }
 
-.thumb-modal__frame img {
+.thumb-modal__frame img,
+.thumb-modal__canvas {
   max-width: 100%;
   max-height: 75vh;
   width: auto;
