@@ -174,7 +174,7 @@ export function App() {
           {step === 3 && (
             <>
               <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
-              <ExportPanel onExport={book.exportBook} />
+              <ExportPanel onExport={book.exportBook} title={book.metadata.title} />
               <div className="nav-actions nav-actions--start">
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(2)}>
                   ページ編集へ戻る

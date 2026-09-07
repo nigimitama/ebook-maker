@@ -6,9 +6,14 @@ type Status = 'idle' | 'running' | 'done' | 'error'
 
 interface ExportPanelProps {
   onExport: (format: Format, onProgress?: (done: number, total: number) => void) => Promise<Blob>
+  title?: string
 }
 
-export function ExportPanel({ onExport }: ExportPanelProps) {
+function sanitizeFileName(name: string): string {
+  return name.trim().replace(/[\\/:*?"<>|]/g, '_')
+}
+
+export function ExportPanel({ onExport, title }: ExportPanelProps) {
   const [format, setFormat] = useState<Format>('pdf')
   const [status, setStatus] = useState<Status>('idle')
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
@@ -77,7 +82,7 @@ export function ExportPanel({ onExport }: ExportPanelProps) {
       {status === 'done' && downloadUrl && (
         <a
           href={downloadUrl}
-          download={format === 'pdf' ? 'book.pdf' : 'book.epub'}
+          download={`${title && sanitizeFileName(title) ? sanitizeFileName(title) : 'book'}.${format}`}
           data-testid="download-link"
         >
           ダウンロード
