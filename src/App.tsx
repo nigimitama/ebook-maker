@@ -111,7 +111,8 @@ export function App() {
                         image={book.selectedImage}
                         adjustment={selectedPage.adjustment ?? DEFAULT_ADJUSTMENT}
                         onAdjustmentChange={(params) => book.updateAdjustment(selectedPage.id, params)}
-                        onApplyToAllPages={() => book.applyAdjustmentToAllPages(selectedPage.id)}
+                        onApplyResizeToAllPages={() => book.applyResizeToAllPages(selectedPage.id)}
+                        onApplyQualityToAllPages={() => book.applyQualityToAllPages(selectedPage.id)}
                         onAutoAdjustPage={() => book.autoAdjustPage(selectedPage.id)}
                         onAutoAdjustAllPages={() => book.autoAdjustAllPages()}
                       />

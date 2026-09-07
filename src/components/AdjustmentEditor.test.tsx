@@ -14,7 +14,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 15, contrast: -20 }}
         onAdjustmentChange={vi.fn()}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -30,7 +31,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 5 }}
         onAdjustmentChange={onAdjustmentChange}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -46,7 +48,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 10, contrast: 0 }}
         onAdjustmentChange={onAdjustmentChange}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -55,20 +58,38 @@ describe('AdjustmentEditor', () => {
     expect(onAdjustmentChange).toHaveBeenCalledWith({ brightness: 10, contrast: -40 })
   })
 
-  it('calls onApplyToAllPages when the apply-to-all button is clicked', () => {
-    const onApplyToAllPages = vi.fn()
+  it('calls onApplyResizeToAllPages when the resize apply-to-all button is clicked', () => {
+    const onApplyResizeToAllPages = vi.fn()
     render(
       <AdjustmentEditor
         image={image()}
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={vi.fn()}
-        onApplyToAllPages={onApplyToAllPages}
+        onApplyResizeToAllPages={onApplyResizeToAllPages}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
     )
-    fireEvent.click(screen.getByText('リサイズ・画質を他のページにも適用'))
-    expect(onApplyToAllPages).toHaveBeenCalled()
+    fireEvent.click(screen.getByText('リサイズを他のページにも適用'))
+    expect(onApplyResizeToAllPages).toHaveBeenCalled()
+  })
+
+  it('calls onApplyQualityToAllPages when the quality apply-to-all button is clicked', () => {
+    const onApplyQualityToAllPages = vi.fn()
+    render(
+      <AdjustmentEditor
+        image={image()}
+        adjustment={{ brightness: 0, contrast: 0 }}
+        onAdjustmentChange={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={onApplyQualityToAllPages}
+        onAutoAdjustPage={vi.fn()}
+        onAutoAdjustAllPages={vi.fn()}
+      />,
+    )
+    fireEvent.click(screen.getByText('画質を他のページにも適用'))
+    expect(onApplyQualityToAllPages).toHaveBeenCalled()
   })
 
   it('calls onAutoAdjustPage when the per-page auto-adjust button is clicked', () => {
@@ -78,7 +99,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={vi.fn()}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={onAutoAdjustPage}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -94,7 +116,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={vi.fn()}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={onAutoAdjustAllPages}
       />,
@@ -109,7 +132,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={vi.fn()}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -127,7 +151,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={onAdjustmentChange}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -145,7 +170,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 0, resizeMode: 'height', resizeHeight: 1920 }}
         onAdjustmentChange={onAdjustmentChange}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,
@@ -164,7 +190,8 @@ describe('AdjustmentEditor', () => {
         image={image()}
         adjustment={{ brightness: 0, contrast: 0 }}
         onAdjustmentChange={onAdjustmentChange}
-        onApplyToAllPages={vi.fn()}
+        onApplyResizeToAllPages={vi.fn()}
+        onApplyQualityToAllPages={vi.fn()}
         onAutoAdjustPage={vi.fn()}
         onAutoAdjustAllPages={vi.fn()}
       />,

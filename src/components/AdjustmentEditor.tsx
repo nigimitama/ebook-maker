@@ -7,7 +7,8 @@ interface AdjustmentEditorProps {
   image: RawImage
   adjustment: AdjustmentParams
   onAdjustmentChange: (params: AdjustmentParams) => void
-  onApplyToAllPages: () => void
+  onApplyResizeToAllPages: () => void
+  onApplyQualityToAllPages: () => void
   onAutoAdjustPage: () => void
   onAutoAdjustAllPages: () => void
 }
@@ -16,7 +17,8 @@ export function AdjustmentEditor({
   image,
   adjustment,
   onAdjustmentChange,
-  onApplyToAllPages,
+  onApplyResizeToAllPages,
+  onApplyQualityToAllPages,
   onAutoAdjustPage,
   onAutoAdjustAllPages,
 }: AdjustmentEditorProps) {
@@ -88,20 +90,25 @@ export function AdjustmentEditor({
             </button>
           </div>
         </fieldset>
-        <label>
-          画質(JPEG品質)
-          <input
-            type="range"
-            min={1}
-            max={100}
-            value={quality}
-            data-testid="quality-slider"
-            onChange={(event) =>
-              onAdjustmentChange({ ...adjustment, quality: Number(event.target.value) })
-            }
-          />
-          <span data-testid="quality-value">{quality}</span>
-        </label>
+        <fieldset className="adjustment-editor__quality">
+          <legend>画質(JPEG品質)</legend>
+          <label>
+            <input
+              type="range"
+              min={1}
+              max={100}
+              value={quality}
+              data-testid="quality-slider"
+              onChange={(event) =>
+                onAdjustmentChange({ ...adjustment, quality: Number(event.target.value) })
+              }
+            />
+            <span data-testid="quality-value">{quality}</span>
+          </label>
+          <button type="button" onClick={onApplyQualityToAllPages}>
+            画質を他のページにも適用
+          </button>
+        </fieldset>
 
         <fieldset className="adjustment-editor__resize">
           <legend>リサイズ</legend>
@@ -157,8 +164,8 @@ export function AdjustmentEditor({
             />
             px
           </label>
-          <button type="button" onClick={onApplyToAllPages}>
-            リサイズ・画質を他のページにも適用
+          <button type="button" onClick={onApplyResizeToAllPages}>
+            リサイズを他のページにも適用
           </button>
         </fieldset>
       </div>

@@ -520,6 +520,7 @@ label {
 }
 
 .adjustment-editor__tone,
+.adjustment-editor__quality,
 .adjustment-editor__resize {
   display: flex;
   flex-wrap: wrap;

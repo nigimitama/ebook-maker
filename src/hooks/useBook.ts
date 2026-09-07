@@ -20,7 +20,8 @@ export interface UseBookResult {
   importFiles: (files: File[]) => Promise<void>
   selectPage: (id: string) => Promise<void>
   updateAdjustment: (id: string, adjustment: AdjustmentParams) => Promise<void>
-  applyAdjustmentToAllPages: (sourceId: string) => Promise<void>
+  applyResizeToAllPages: (sourceId: string) => Promise<void>
+  applyQualityToAllPages: (sourceId: string) => Promise<void>
   autoAdjustPage: (id: string) => Promise<void>
   autoAdjustAllPages: () => Promise<void>
   reorderPages: (orderedIds: string[]) => Promise<void>
@@ -327,27 +328,39 @@ export function useBook(): UseBookResult {
     pending.set(id, { timer, adjustment })
   }, [])
 
-  // リサイズ・画質だけを他のページにも複製する。明るさ・コントラストは
-  // ページごとに自動補正した値を持っているため、ここでは触れない
-  // (以前はここで明るさ・コントラストも含む調整値全体をコピーしており、
-  // リサイズを揃えるだけのつもりが他ページの補正値まで上書きしてしまっていた)。
-  const applyAdjustmentToAllPages = useCallback(
+  // リサイズ設定だけを他のページにも複製する。明るさ・コントラスト・画質は
+  // ページごとに個別の値を持っているため、ここでは触れない
+  // (以前はここで調整値全体をコピーしており、リサイズを揃えるだけのつもりが
+  // 他ページの補正値まで上書きしてしまっていた)。
+  const applyResizeToAllPages = useCallback(
     async (sourceId: string) => {
       const store = storeRef.current
       if (!store) return
       await flushPendingAdjustments()
       const source = pages.find((p) => p.id === sourceId)
       if (!source) return
-      const { resizeMode, resizeWidth, resizeHeight, quality } = source.adjustment
+      const { resizeMode, resizeWidth, resizeHeight } = source.adjustment
       for (const page of pages) {
         if (page.id === sourceId) continue
-        await store.updateAdjustment(page.id, {
-          ...page.adjustment,
-          resizeMode,
-          resizeWidth,
-          resizeHeight,
-          quality,
-        })
+        await store.updateAdjustment(page.id, { ...page.adjustment, resizeMode, resizeWidth, resizeHeight })
+      }
+      await refreshPages()
+    },
+    [pages, refreshPages, flushPendingAdjustments],
+  )
+
+  // 画質だけを他のページにも複製する。
+  const applyQualityToAllPages = useCallback(
+    async (sourceId: string) => {
+      const store = storeRef.current
+      if (!store) return
+      await flushPendingAdjustments()
+      const source = pages.find((p) => p.id === sourceId)
+      if (!source) return
+      const { quality } = source.adjustment
+      for (const page of pages) {
+        if (page.id === sourceId) continue
+        await store.updateAdjustment(page.id, { ...page.adjustment, quality })
       }
       await refreshPages()
     },
@@ -523,7 +536,8 @@ export function useBook(): UseBookResult {
     importFiles,
     selectPage,
     updateAdjustment,
-    applyAdjustmentToAllPages,
+    applyResizeToAllPages,
+    applyQualityToAllPages,
     autoAdjustPage,
     autoAdjustAllPages,
     reorderPages,
