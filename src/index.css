@@ -357,6 +357,8 @@ label {
   padding: 0;
   margin: 0;
   border-top: 1px solid var(--color-divider);
+  max-height: 70vh;
+  overflow-y: auto;
 }
 
 .page-row {
@@ -398,17 +400,30 @@ label {
   background: var(--color-bg);
 }
 
-.page-row__name {
+.page-row__name-block {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.page-row__name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
 }
 
-.page-row__resize-badge {
-  margin-left: 8px;
+.page-row__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.page-row__tone-badge,
+.page-row__resize-badge,
+.page-row__quality-badge {
   padding: 1px 6px;
   border: 1px solid var(--color-divider);
   border-radius: 3px;
@@ -502,6 +517,13 @@ label {
   gap: 16px;
 }
 
+.adjustment-editor__auto {
+  display: flex;
+  gap: 8px;
+}
+
+.adjustment-editor__tone,
+.adjustment-editor__quality,
 .adjustment-editor__resize {
   display: flex;
   flex-wrap: wrap;

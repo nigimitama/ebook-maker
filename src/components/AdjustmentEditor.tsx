@@ -7,14 +7,20 @@ interface AdjustmentEditorProps {
   image: RawImage
   adjustment: AdjustmentParams
   onAdjustmentChange: (params: AdjustmentParams) => void
-  onApplyToAllPages: () => void
+  onApplyResizeToAllPages: () => void
+  onApplyQualityToAllPages: () => void
+  onApplyToneToAllPages: () => void
+  onAutoAdjustAllPages: () => void
 }
 
 export function AdjustmentEditor({
   image,
   adjustment,
   onAdjustmentChange,
-  onApplyToAllPages,
+  onApplyResizeToAllPages,
+  onApplyQualityToAllPages,
+  onApplyToneToAllPages,
+  onAutoAdjustAllPages,
 }: AdjustmentEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const resizeMode = adjustment.resizeMode ?? 'none'
@@ -45,46 +51,64 @@ export function AdjustmentEditor({
         className="adjustment-editor__canvas"
       />
       <div className="adjustment-editor__controls">
-        <label>
-          明るさ
-          <input
-            type="range"
-            min={-100}
-            max={100}
-            value={adjustment.brightness}
-            data-testid="brightness-slider"
-            onChange={(event) =>
-              onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
-            }
-          />
-        </label>
-        <label>
-          コントラスト
-          <input
-            type="range"
-            min={-100}
-            max={100}
-            value={adjustment.contrast}
-            data-testid="contrast-slider"
-            onChange={(event) =>
-              onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
-            }
-          />
-        </label>
-        <label>
-          画質(JPEG品質)
-          <input
-            type="range"
-            min={1}
-            max={100}
-            value={quality}
-            data-testid="quality-slider"
-            onChange={(event) =>
-              onAdjustmentChange({ ...adjustment, quality: Number(event.target.value) })
-            }
-          />
-          <span data-testid="quality-value">{quality}</span>
-        </label>
+        <fieldset className="adjustment-editor__tone">
+          <legend>明るさ・コントラスト</legend>
+          <label>
+            明るさ
+            <input
+              type="range"
+              min={-100}
+              max={100}
+              value={adjustment.brightness}
+              data-testid="brightness-slider"
+              onChange={(event) =>
+                onAdjustmentChange({ ...adjustment, brightness: Number(event.target.value) })
+              }
+            />
+            <span data-testid="brightness-value">{adjustment.brightness}</span>
+          </label>
+          <label>
+            コントラスト
+            <input
+              type="range"
+              min={-100}
+              max={100}
+              value={adjustment.contrast}
+              data-testid="contrast-slider"
+              onChange={(event) =>
+                onAdjustmentChange({ ...adjustment, contrast: Number(event.target.value) })
+              }
+            />
+            <span data-testid="contrast-value">{adjustment.contrast}</span>
+          </label>
+          <div className="adjustment-editor__auto">
+            <button type="button" onClick={onApplyToneToAllPages}>
+              他のページにも適用
+            </button>
+            <button type="button" data-testid="auto-adjust-all" onClick={onAutoAdjustAllPages}>
+              全ページを自動補正
+            </button>
+          </div>
+        </fieldset>
+        <fieldset className="adjustment-editor__quality">
+          <legend>画質(JPEG品質)</legend>
+          <label>
+            <input
+              type="range"
+              min={1}
+              max={100}
+              value={quality}
+              data-testid="quality-slider"
+              onChange={(event) =>
+                onAdjustmentChange({ ...adjustment, quality: Number(event.target.value) })
+              }
+            />
+            <span data-testid="quality-value">{quality}</span>
+          </label>
+          <button type="button" onClick={onApplyQualityToAllPages}>
+            画質を他のページにも適用
+          </button>
+        </fieldset>
 
         <fieldset className="adjustment-editor__resize">
           <legend>リサイズ</legend>
@@ -140,11 +164,10 @@ export function AdjustmentEditor({
             />
             px
           </label>
+          <button type="button" onClick={onApplyResizeToAllPages}>
+            リサイズを他のページにも適用
+          </button>
         </fieldset>
-
-        <button type="button" onClick={onApplyToAllPages}>
-          他のページにも適用
-        </button>
       </div>
     </div>
   )

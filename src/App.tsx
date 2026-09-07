@@ -111,7 +111,10 @@ export function App() {
                         image={book.selectedImage}
                         adjustment={selectedPage.adjustment ?? DEFAULT_ADJUSTMENT}
                         onAdjustmentChange={(params) => book.updateAdjustment(selectedPage.id, params)}
-                        onApplyToAllPages={() => book.applyAdjustmentToAllPages(selectedPage.id)}
+                        onApplyResizeToAllPages={() => book.applyResizeToAllPages(selectedPage.id)}
+                        onApplyQualityToAllPages={() => book.applyQualityToAllPages(selectedPage.id)}
+                        onApplyToneToAllPages={() => book.applyToneToAllPages(selectedPage.id)}
+                        onAutoAdjustAllPages={() => book.autoAdjustAllPages()}
                       />
                     ) : (
                       // 画素の準備が整うまでの繋ぎ。ここでエディタごと消すと、ページを
