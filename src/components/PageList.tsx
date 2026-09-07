@@ -47,6 +47,11 @@ function resizeLabel(adjustment: AdjustmentParams): string | null {
   return null
 }
 
+function toneLabel(adjustment: AdjustmentParams): string | null {
+  if (adjustment.brightness === 0 && adjustment.contrast === 0) return null
+  return `明るさ${adjustment.brightness} コントラスト${adjustment.contrast}`
+}
+
 interface PageListProps {
   pages: PageEntry[]
   thumbnails: Record<string, string>
@@ -308,13 +313,22 @@ export function PageList({
                       style={adjustmentPreviewStyle(page.adjustment)}
                     />
                   </button>
-                  <span className="page-row__name" title={displayName}>
-                    {displayName}
-                    {resizeLabel(page.adjustment) && (
-                      <span className="page-row__resize-badge" data-testid={`resize-badge-${page.id}`}>
-                        {resizeLabel(page.adjustment)}
-                      </span>
-                    )}
+                  <span className="page-row__name-block">
+                    <span className="page-row__name" title={displayName}>
+                      {displayName}
+                    </span>
+                    <span className="page-row__badges">
+                      {toneLabel(page.adjustment) && (
+                        <span className="page-row__tone-badge" data-testid={`tone-badge-${page.id}`}>
+                          {toneLabel(page.adjustment)}
+                        </span>
+                      )}
+                      {resizeLabel(page.adjustment) && (
+                        <span className="page-row__resize-badge" data-testid={`resize-badge-${page.id}`}>
+                          {resizeLabel(page.adjustment)}
+                        </span>
+                      )}
+                    </span>
                   </span>
                   <div className="page-row__actions">
                     <button
