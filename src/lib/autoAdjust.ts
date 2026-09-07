@@ -19,9 +19,10 @@ export function computeAutoAdjustment(image: RawImage): AdjustmentParams {
   const lo = sorted[Math.floor(sorted.length * 0.01)]
   const hi = sorted[Math.ceil(sorted.length * 0.99) - 1]
   const range = Math.max(hi - lo, 1)
-  const factor = clamp(255 / range, 0.1, 4)
+  const rawFactor = clamp(255 / range, 0.1, 4)
+  const contrast = clamp(rawFactor * 100 - 100, -100, 100)
+  const factor = (100 + contrast) / 100
   const mid = (lo + hi) / 2
-  const contrast = clamp(factor * 100 - 100, -100, 100)
   const brightness = clamp(-(mid - 128) * factor, -100, 100)
   return { brightness: Math.round(brightness), contrast: Math.round(contrast) }
 }
