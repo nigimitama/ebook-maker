@@ -119,19 +119,27 @@ describe('ImportPanel', () => {
     expect(screen.queryByTestId('clear-all-button')).not.toBeInTheDocument()
   })
 
-  it('calls onClearAll after confirmation when the clear-all button is clicked', () => {
+  it('calls onClearAll immediately when the clear-all button is clicked, without a confirmation dialog', () => {
     const onClearAll = vi.fn()
-    vi.spyOn(window, 'confirm').mockReturnValue(true)
     render(<ImportPanel onImport={vi.fn()} pageCount={3} onClearAll={onClearAll} />)
     fireEvent.click(screen.getByTestId('clear-all-button'))
     expect(onClearAll).toHaveBeenCalledTimes(1)
   })
 
-  it('does not call onClearAll when the confirmation is dismissed', () => {
-    const onClearAll = vi.fn()
-    vi.spyOn(window, 'confirm').mockReturnValue(false)
-    render(<ImportPanel onImport={vi.fn()} pageCount={3} onClearAll={onClearAll} />)
-    fireEvent.click(screen.getByTestId('clear-all-button'))
-    expect(onClearAll).not.toHaveBeenCalled()
+  it('does not show an undo button when canUndoClearAll is false', () => {
+    render(<ImportPanel onImport={vi.fn()} onUndoClearAll={vi.fn()} />)
+    expect(screen.queryByTestId('undo-clear-all-button')).not.toBeInTheDocument()
+  })
+
+  it('shows an undo button after clearing when canUndoClearAll is true', () => {
+    render(<ImportPanel onImport={vi.fn()} canUndoClearAll onUndoClearAll={vi.fn()} />)
+    expect(screen.getByTestId('undo-clear-all-button')).toBeInTheDocument()
+  })
+
+  it('calls onUndoClearAll when the undo button is clicked', () => {
+    const onUndoClearAll = vi.fn()
+    render(<ImportPanel onImport={vi.fn()} canUndoClearAll onUndoClearAll={onUndoClearAll} />)
+    fireEvent.click(screen.getByTestId('undo-clear-all-button'))
+    expect(onUndoClearAll).toHaveBeenCalledTimes(1)
   })
 })

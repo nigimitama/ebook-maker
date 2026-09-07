@@ -74,6 +74,8 @@ export function App() {
                 onImport={book.importFiles}
                 pageCount={book.pages.length}
                 onClearAll={book.clearAllPages}
+                canUndoClearAll={book.canUndoClearAll}
+                onUndoClearAll={book.undoClearAll}
                 importProgress={book.importProgress}
               />
               <div className="nav-actions nav-actions--end">

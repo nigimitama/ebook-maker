@@ -318,6 +318,10 @@ label {
   font-weight: normal;
 }
 
+.import-count__undo {
+  font-weight: normal;
+}
+
 /* — 並べ替え・調整工程: 左に PageList、右にプレビュー(AdjustmentEditor) を並べる — */
 .page-adjust-layout {
   display: flex;
