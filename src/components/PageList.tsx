@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
 import { applyAdjustment } from '../lib/applyAdjustment'
+import { DEFAULT_JPEG_QUALITY } from '../types'
 import type { AdjustmentParams, PageEntry, RawImage } from '../types'
 
 // サムネイルは無加工の原本(thumbBlobId)なので、一覧でも調整の効果が一目で
@@ -50,6 +51,12 @@ function resizeLabel(adjustment: AdjustmentParams): string | null {
 function toneLabel(adjustment: AdjustmentParams): string | null {
   if (adjustment.brightness === 0 && adjustment.contrast === 0) return null
   return `明るさ${adjustment.brightness} コントラスト${adjustment.contrast}`
+}
+
+function qualityLabel(adjustment: AdjustmentParams): string | null {
+  const quality = adjustment.quality ?? DEFAULT_JPEG_QUALITY
+  if (quality === DEFAULT_JPEG_QUALITY) return null
+  return `画質 ${quality}`
 }
 
 interface PageListProps {
@@ -326,6 +333,11 @@ export function PageList({
                       {resizeLabel(page.adjustment) && (
                         <span className="page-row__resize-badge" data-testid={`resize-badge-${page.id}`}>
                           {resizeLabel(page.adjustment)}
+                        </span>
+                      )}
+                      {qualityLabel(page.adjustment) && (
+                        <span className="page-row__quality-badge" data-testid={`quality-badge-${page.id}`}>
+                          {qualityLabel(page.adjustment)}
                         </span>
                       )}
                     </span>

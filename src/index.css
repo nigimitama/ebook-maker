@@ -420,7 +420,8 @@ label {
 }
 
 .page-row__tone-badge,
-.page-row__resize-badge {
+.page-row__resize-badge,
+.page-row__quality-badge {
   padding: 1px 6px;
   border: 1px solid var(--color-divider);
   border-radius: 3px;
