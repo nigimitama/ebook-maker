@@ -27,6 +27,6 @@ export function hasOcrText(pages: { id: string }[], results: Record<string, OcrR
 /** 書名からテキストのファイル名を作る。使えない文字・ドットだけ・空は 'ocr' に落とす。 */
 export function ocrFileName(title?: string): string {
   // eslint-disable-next-line no-control-regex
-  const base = (title ?? '').replace(/[\/:*?"<>|\x00-\x1f]/g, '_').trim()
+  const base = (title ?? '').replace(/[\\/:*?"<>|\x00-\x1f]/g, '_').trim()
   return `${/^\.*$/.test(base) ? 'ocr' : base}.txt`
 }
