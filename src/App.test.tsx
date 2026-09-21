@@ -61,14 +61,57 @@ describe('App', () => {
     expect(screen.getByText('見開き結合')).toBeInTheDocument()
   })
 
-  it('advances to the 詳細＆書き出し step and shows the export panel', () => {
+  it('shows the four steps of the flow', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
+    render(<App />)
+    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '詳細＆書き出し']) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+  })
+
+  it('advances from 並べ替え・調整 to the OCR確認・修正 step', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
+    expect(screen.getByText('このページをOCR')).toBeInTheDocument()
+  })
+
+  it('advances from the OCR確認・修正 step to 詳細＆書き出し', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
+  })
+
+  // OCRは任意工程。飛ばしても書き出しに進める。
+  it('lets the user skip the OCR step and export directly', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRをスキップして書き出しへ'))
+    expect(screen.getByText('書き出し')).toBeInTheDocument()
+    expect(screen.queryByText('このページをOCR')).not.toBeInTheDocument()
+  })
+
+  it('returns from the 書き出し step to the OCR確認・修正 step', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('詳細情報へ進む'))
+    fireEvent.click(screen.getByText('OCR確認へ戻る'))
+    expect(screen.getByText('このページをOCR')).toBeInTheDocument()
   })
 
   it('shows the AdjustmentEditor on the 並べ替え・調整 step once a page is selected and its image is loaded', () => {
@@ -106,6 +149,18 @@ describe('App', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(props)
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
+    expect(props.selectPage).toHaveBeenCalledWith('a')
+  })
+
+  // OCR画面も選択中ページの画素(selectedImage)に頼るため、自動選択が要る。
+  it('selects the first page automatically on entering the OCR確認・修正 step', () => {
+    const props = mockBook({ pages: [page], thumbnails: { a: 'blob:a' } })
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(props)
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRをスキップして書き出しへ'))
+    ;(props.selectPage as ReturnType<typeof vi.fn>).mockClear()
+    fireEvent.click(screen.getByText('OCR確認・修正'))
     expect(props.selectPage).toHaveBeenCalledWith('a')
   })
 
