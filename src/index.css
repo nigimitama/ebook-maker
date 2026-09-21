@@ -605,3 +605,9 @@ label {
   background: var(--color-accent);
   transition: width 0.15s ease-out;
 }
+
+.thumb-modal__loading {
+  padding: 3rem 4rem;
+  color: #fff;
+  text-align: center;
+}

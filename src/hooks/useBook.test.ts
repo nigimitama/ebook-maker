@@ -83,7 +83,9 @@ function pauseDownscale(): () => void {
   }
 }
 
-vi.mock('../lib/downscaleImage', () => ({
+vi.mock('../lib/downscaleImage', async (importOriginal) => ({
+  // hideFromDevtools は純粋関数なので本物を使う。
+  ...(await importOriginal<typeof import('../lib/downscaleImage')>()),
   downscale: async (blob: Blob, maxEdge: number) => {
     if (downscaleGate) await downscaleGate.wait
     return downscaleFake(blob, maxEdge)
@@ -216,31 +218,32 @@ describe('useBook', () => {
   it('never pairs the previous page’s pixels with the newly selected page', async () => {
     const view = await importPages([
       imageFile('a.png', [10, 20, 30, 255]),
-      imageFile('b.png', [200, 210, 220, 255]),
+      imageFile('b.png', [100, 110, 120, 255]),
+      imageFile('c.png', [200, 210, 220, 255]),
     ])
-    const [a, b] = view.result.current.pages
+    const [a, , c] = view.result.current.pages
     await act(async () => {
       await view.result.current.selectPage(a.id)
     })
     expect(Array.from(view.result.current.selectedImage!.data)).toEqual([10, 20, 30, 255])
 
-    // Bへの切り替え中、デコードが終わるまで止める。この間にAの画素が
+    // Cへの切り替え中、デコードが終わるまで止める。この間にAの画素が
     // 残っていると、画面上はAの画像にBの調整値が当たったものが表示される。
     const resume = pauseDownscale()
     let switching: Promise<void>
     await act(async () => {
-      switching = view.result.current.selectPage(b.id)
+      switching = view.result.current.selectPage(c.id)
       await Promise.resolve()
     })
 
-    expect(view.result.current.selectedPageId).toBe(b.id)
+    expect(view.result.current.selectedPageId).toBe(c.id)
     expect(view.result.current.selectedImage).toBeNull()
 
     await act(async () => {
       resume()
       await switching
     })
-    expect(view.result.current.selectedPageId).toBe(b.id)
+    expect(view.result.current.selectedPageId).toBe(c.id)
     expect(Array.from(view.result.current.selectedImage!.data)).toEqual([200, 210, 220, 255])
   })
 
