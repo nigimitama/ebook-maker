@@ -30,7 +30,7 @@ export function OcrOverlay({
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const areaRef = useRef<HTMLDivElement>(null)
   const dragStart = useRef<Point | null>(null)
-  const [draft, setDraft] = useState<{ a: Point; b: Point; left: number; top: number } | null>(null)
+  const [draft, setDraft] = useState<{ a: Point; b: Point; left: number; top: number; width: number; height: number } | null>(null)
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -49,6 +49,21 @@ export function OcrOverlay({
     }
   }, [addMode])
 
+  const dragging = draft !== null
+  useEffect(() => {
+    if (!dragging) return
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') cancelDrag()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [dragging])
+
+  function cancelDrag() {
+    dragStart.current = null
+    setDraft(null)
+  }
+
   function pointOf(event: React.PointerEvent): Point {
     return { x: event.clientX, y: event.clientY }
   }
@@ -57,6 +72,7 @@ export function OcrOverlay({
     const start = dragStart.current
     dragStart.current = null
     setDraft(null)
+    areaRef.current?.releasePointerCapture?.(event.pointerId)
     const area = areaRef.current
     if (!start || !area) return
     const rect = area.getBoundingClientRect()
@@ -70,12 +86,13 @@ export function OcrOverlay({
   const pct = (v: number, total: number) => `${(v / total) * 100}%`
   const draftStyle = (() => {
     if (!draft) return null
-    return {
-      left: Math.min(draft.a.x, draft.b.x) - draft.left,
-      top: Math.min(draft.a.y, draft.b.y) - draft.top,
-      width: Math.abs(draft.b.x - draft.a.x),
-      height: Math.abs(draft.b.y - draft.a.y),
-    }
+    const cx = (v: number) => Math.min(draft.width, Math.max(0, v - draft.left))
+    const cy = (v: number) => Math.min(draft.height, Math.max(0, v - draft.top))
+    const x1 = cx(draft.a.x)
+    const x2 = cx(draft.b.x)
+    const y1 = cy(draft.a.y)
+    const y2 = cy(draft.b.y)
+    return { left: Math.min(x1, x2), top: Math.min(y1, y2), width: Math.abs(x2 - x1), height: Math.abs(y2 - y1) }
   })()
 
   return (
@@ -90,17 +107,15 @@ export function OcrOverlay({
         const p = pointOf(event)
         const rect = event.currentTarget.getBoundingClientRect()
         dragStart.current = p
-        setDraft({ a: p, b: p, left: rect.left, top: rect.top })
+        setDraft({ a: p, b: p, left: rect.left, top: rect.top, width: rect.width, height: rect.height })
       }}
       onPointerMove={(event) => {
         if (!dragStart.current) return
         setDraft((d) => (d ? { ...d, b: pointOf(event) } : d))
       }}
       onPointerUp={finish}
-      onPointerCancel={() => {
-        dragStart.current = null
-        setDraft(null)
-      }}
+      onPointerCancel={cancelDrag}
+      onLostPointerCapture={cancelDrag}
     >
       <canvas ref={canvasRef} className="ocr-stage__canvas" aria-label="ページ画像" />
       {lines.map((line, index) => (

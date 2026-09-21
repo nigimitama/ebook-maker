@@ -62,17 +62,18 @@ function makeOcr(over: Partial<UseOcrResult> = {}): UseOcrResult {
 
 function setup(ocr: UseOcrResult, selectedPageId = 'a') {
   const onSelect = vi.fn()
-  render(
+  const ui = (o: UseOcrResult) => (
     <OcrReview
       pages={pages}
       thumbnails={thumbnails}
       selectedPageId={selectedPageId}
       selectedImage={{ data: new Uint8ClampedArray(4 * 10 * 20), width: 10, height: 20 }}
       onSelect={onSelect}
-      ocr={ocr}
-    />,
+      ocr={o}
+    />
   )
-  return { onSelect }
+  const { rerender } = render(ui(ocr))
+  return { onSelect, update: (o: UseOcrResult) => rerender(ui(o)) }
 }
 
 describe('OcrReview', () => {
@@ -170,9 +171,9 @@ describe('OcrReview', () => {
     const ocr = makeOcr({ runAll: vi.fn().mockResolvedValue({ skippedEdited: ['b'] }) })
     setup(ocr)
     fireEvent.click(screen.getByRole('button', { name: '全ページをOCR' }))
-    expect(ocr.runAll).toHaveBeenCalledWith(['a', 'b', 'c'])
+    expect(ocr.runAll).toHaveBeenCalledWith(['a', 'b', 'c'], { skipDone: true })
     fireEvent.click(await screen.findByRole('button', { name: '修正済みの行があります。上書きして再実行' }))
-    expect(ocr.runAll).toHaveBeenLastCalledWith(['a', 'b', 'c'], { overwriteEdited: true })
+    expect(ocr.runAll).toHaveBeenLastCalledWith(['a', 'b', 'c'], { skipDone: true, overwriteEdited: true })
   })
 
   it('エラーバナーと閉じるボタン', () => {
@@ -206,5 +207,97 @@ describe('OcrReview', () => {
     await waitFor(() =>
       expect(ocr.addLine).toHaveBeenCalledWith('a', { x: 50, y: 50, w: 200, h: 250 }, 'l2'),
     )
+  })
+
+  it('編集中の下書きは、同じ行のテキストが外から変わっても上書きされない', () => {
+    const ocr = makeOcr({ results: { a: resultA } })
+    const { update } = setup(ocr)
+    const area = () => within(screen.getByTestId('ocr-line-l1')).getByRole('textbox') as HTMLTextAreaElement
+    fireEvent.change(area(), { target: { value: '入力中' } })
+    const changed = { ...resultA, lines: resultA.lines.map((l) => (l.id === 'l1' ? { ...l, text: '新結果' } : l)) }
+    update({ ...ocr, results: { a: changed } })
+    expect(area().value).toBe('入力中')
+  })
+
+  it('編集していない行は外からの更新に追従する', () => {
+    const ocr = makeOcr({ results: { a: resultA } })
+    const { update } = setup(ocr)
+    const changed = { ...resultA, lines: resultA.lines.map((l) => (l.id === 'l1' ? { ...l, text: '新結果' } : l)) }
+    update({ ...ocr, results: { a: changed } })
+    expect((within(screen.getByTestId('ocr-line-l1')).getByRole('textbox') as HTMLTextAreaElement).value).toBe('新結果')
+  })
+
+  it('編集直後に↑を押すと、編集の保存が先に呼ばれてから moveLine が呼ばれる', () => {
+    const ocr = makeOcr({ results: { a: resultA } })
+    setup(ocr)
+    const row = screen.getByTestId('ocr-line-l2')
+    fireEvent.change(within(row).getByRole('textbox'), { target: { value: '直した' } })
+    fireEvent.blur(within(row).getByRole('textbox'))
+    fireEvent.click(within(row).getByRole('button', { name: '上へ移動' }))
+    const upd = (ocr.updateLine as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    const mv = (ocr.moveLine as ReturnType<typeof vi.fn>).mock.invocationCallOrder[0]
+    expect(upd).toBeLessThan(mv)
+  })
+
+  it('別ページの結果で行IDが変わると古い下書きは破棄される', () => {
+    const ocr = makeOcr({ results: { a: resultA } })
+    const { update } = setup(ocr)
+    fireEvent.change(within(screen.getByTestId('ocr-line-l1')).getByRole('textbox'), { target: { value: '古い' } })
+    const fresh: OcrResult = { ...resultA, lines: [{ id: 'n1', x: 1, y: 1, w: 50, h: 50, text: '再実行', edited: false }] }
+    update({ ...ocr, results: { a: fresh } })
+    expect((within(screen.getByTestId('ocr-line-n1')).getByRole('textbox') as HTMLTextAreaElement).value).toBe('再実行')
+    expect(screen.queryByTestId('ocr-line-l1')).toBeNull()
+  })
+
+  function startAdd() {
+    const ocr = makeOcr({ results: { a: resultA } })
+    setup(ocr)
+    fireEvent.click(screen.getByRole('button', { name: '枠を追加' }))
+    const area = screen.getByTestId('ocr-draw-area')
+    area.getBoundingClientRect = () =>
+      ({ left: 0, top: 0, width: 200, height: 400, right: 200, bottom: 400, x: 0, y: 0 }) as DOMRect
+    return { ocr, area }
+  }
+
+  it('Escapeでドラッグを取り消し、枠は追加されない', () => {
+    const { ocr, area } = startAdd()
+    fireEvent.pointerDown(area, { clientX: 10, clientY: 10, pointerId: 1 })
+    fireEvent.pointerMove(area, { clientX: 50, clientY: 60, pointerId: 1 })
+    fireEvent.keyDown(window, { key: 'Escape' })
+    fireEvent.pointerUp(area, { clientX: 50, clientY: 60, pointerId: 1 })
+    expect(ocr.addLine).not.toHaveBeenCalled()
+  })
+
+  it('pointercancelでドラッグを取り消す', () => {
+    const { ocr, area } = startAdd()
+    fireEvent.pointerDown(area, { clientX: 10, clientY: 10, pointerId: 1 })
+    fireEvent(area, new PointerEvent('pointercancel', { bubbles: true, pointerId: 1 }))
+    fireEvent.pointerUp(area, { clientX: 50, clientY: 60, pointerId: 1 })
+    expect(ocr.addLine).not.toHaveBeenCalled()
+  })
+
+  it('逆方向(右下から左上)のドラッグでも枠を追加できる', async () => {
+    const { ocr, area } = startAdd()
+    fireEvent.pointerDown(area, { clientX: 50, clientY: 60, pointerId: 1 })
+    fireEvent.pointerUp(area, { clientX: 10, clientY: 10, pointerId: 1 })
+    await waitFor(() => expect(ocr.addLine).toHaveBeenCalledWith('a', { x: 50, y: 50, w: 200, h: 250 }, undefined))
+  })
+
+  it('再実行の確認は、そのページの結果が変わると消える', async () => {
+    const ocr = makeOcr({
+      results: { a: resultA },
+      runOne: vi.fn().mockResolvedValue({ skippedEdited: ['a'] }),
+    })
+    const { update } = setup(ocr)
+    fireEvent.click(screen.getByRole('button', { name: 'このページをOCR' }))
+    await screen.findByRole('button', { name: '修正済みの行があります。上書きして再実行' })
+    update({ ...ocr, results: { a: { ...resultA, updatedAt: 2 } } })
+    expect(screen.queryByRole('button', { name: '修正済みの行があります。上書きして再実行' })).toBeNull()
+  })
+
+  it('ページ一覧の行はキーボード(Enter)で選択できる', () => {
+    const { onSelect } = setup(makeOcr())
+    fireEvent.keyDown(screen.getByTestId('ocr-page-c'), { key: 'Enter' })
+    expect(onSelect).toHaveBeenCalledWith('c')
   })
 })

@@ -49,7 +49,11 @@ function LineRow({
   onMove,
 }: LineRowProps) {
   const [draft, setDraft] = useState(line.text)
-  useEffect(() => setDraft(line.text), [line.text])
+  // 入力中(未保存)の下書きは、外からのテキスト更新で上書きしない。
+  const dirty = useRef(false)
+  useEffect(() => {
+    if (!dirty.current) setDraft(line.text)
+  }, [line.text])
   const label = `行${index + 1}`
   return (
     <li
@@ -91,8 +95,13 @@ function LineRow({
         rows={2}
         value={draft}
         onFocus={onFocus}
-        onChange={(event) => setDraft(event.target.value)}
+        onChange={(event) => {
+          dirty.current = true
+          setDraft(event.target.value)
+        }}
         onBlur={() => {
+          if (!dirty.current) return
+          dirty.current = false
           if (draft !== line.text) onCommit(draft)
         }}
       />
@@ -110,7 +119,7 @@ export function OcrReview({
 }: OcrReviewProps) {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
   const [addMode, setAddMode] = useState(false)
-  const [overwrite, setOverwrite] = useState<null | { kind: 'one' | 'all'; pageId: string | null }>(null)
+  const [overwrite, setOverwrite] = useState<null | { kind: 'one' | 'all'; pageId: string | null; result?: OcrResult }>(null)
   const textareas = useRef<Map<string, HTMLTextAreaElement>>(new Map())
 
   const page = pages.find((p) => p.id === selectedPageId) ?? null
@@ -129,12 +138,14 @@ export function OcrReview({
     if (!page) return
     setOverwrite(null)
     const summary = opts ? await ocr.runOne(page.id, opts) : await ocr.runOne(page.id)
-    if (summary.skippedEdited.length > 0) setOverwrite({ kind: 'one', pageId: page.id })
+    if (summary.skippedEdited.length > 0) {
+      setOverwrite({ kind: 'one', pageId: page.id, result: ocr.results[page.id] })
+    }
   }
 
   async function runEveryPage(opts?: { overwriteEdited: true }) {
     setOverwrite(null)
-    const summary = opts ? await ocr.runAll(allIds, opts) : await ocr.runAll(allIds)
+    const summary = await ocr.runAll(allIds, { skipDone: true, ...opts })
     if (summary.skippedEdited.length > 0) setOverwrite({ kind: 'all', pageId: null })
   }
 
@@ -142,6 +153,11 @@ export function OcrReview({
     setSelectedLineId(id)
     textareas.current.get(id)?.focus()
   }
+
+  // 対象ページの結果が(再実行・編集で)変わったら、古い確認は出さない。
+  const overwriteVisible =
+    overwrite !== null &&
+    (overwrite.kind === 'all' || ocr.results[overwrite.pageId ?? ''] === overwrite.result)
 
   const stage = ocr.progress?.stage
   const progressLabel = stage && STAGE_LABEL[stage] ? STAGE_LABEL[stage] : '文字認識中'
@@ -190,13 +206,13 @@ export function OcrReview({
         </button>
       </div>
 
-      {overwrite && !ocr.running && (
+      {overwriteVisible && !ocr.running && (
         <div className="ocr-review__notice" data-testid="ocr-overwrite-notice">
           <button
             type="button"
             className="btn btn-ghost"
             onClick={() =>
-              overwrite.kind === 'one' ? void runThisPage({ overwriteEdited: true }) : void runEveryPage({ overwriteEdited: true })
+              overwrite?.kind === 'one' ? void runThisPage({ overwriteEdited: true }) : void runEveryPage({ overwriteEdited: true })
             }
           >
             修正済みの行があります。上書きして再実行
@@ -226,25 +242,37 @@ export function OcrReview({
       <div className="page-adjust-layout ocr-review__layout">
         <div className="ocr-review__pages panel">
           <ul className="page-list__items">
-            {pages.map((p) => (
+            {pages.map((p) => {
+              const status = statusOf(ocr.results[p.id])
+              return (
               <li
                 key={p.id}
                 data-testid={`ocr-page-${p.id}`}
+                role="button"
+                tabIndex={0}
+                aria-current={p.id === selectedPageId ? 'true' : undefined}
                 className={p.id === selectedPageId ? 'page-row page-row--selected' : 'page-row'}
                 onClick={() => onSelect(p.id)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault()
+                    onSelect(p.id)
+                  }
+                }}
               >
                 <img src={thumbnails[p.id]} alt={`page ${p.order + 1}`} className="page-list__thumb" />
                 <span className="page-row__name" title={p.fileName ?? `ページ ${p.order + 1}`}>
                   {p.fileName ?? `ページ ${p.order + 1}`}
                 </span>
                 <span
-                  className={`ocr-status ocr-status--${statusOf(ocr.results[p.id]) === '未' ? 'none' : statusOf(ocr.results[p.id]) === '済' ? 'done' : 'edited'}`}
+                  className={`ocr-status ocr-status--${status === '未' ? 'none' : status === '済' ? 'done' : 'edited'}`}
                   data-testid={`ocr-status-${p.id}`}
                 >
-                  {statusOf(ocr.results[p.id])}
+                  {status}
                 </span>
               </li>
-            ))}
+              )
+            })}
           </ul>
         </div>
 

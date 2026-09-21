@@ -687,18 +687,18 @@ label {
 .ocr-box {
   position: absolute;
   padding: 0;
-  border: 1px solid rgba(220, 40, 40, 0.8);
-  background: rgba(220, 40, 40, 0.08);
+  border: 1px solid var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   cursor: pointer;
 }
 
 .ocr-box--selected {
-  border: 2px solid #1a6ee0;
-  background: rgba(26, 110, 224, 0.18);
+  border: 2px solid var(--color-accent-strong);
+  background: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
 .ocr-box--draft {
-  border: 1px dashed #1a6ee0;
+  border: 1px dashed var(--color-accent-strong);
   pointer-events: none;
 }
 
@@ -715,8 +715,8 @@ label {
 }
 
 .ocr-line--selected {
-  border-color: #1a6ee0;
-  box-shadow: 0 0 0 1px #1a6ee0;
+  border-color: var(--color-accent-strong);
+  box-shadow: 0 0 0 1px var(--color-accent-strong);
 }
 
 .ocr-line__head {
