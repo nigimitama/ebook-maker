@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "oxlint",
+    "fetch-models": "node scripts/fetch-models.mjs",
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
@@ -15,6 +16,7 @@
   },
   "dependencies": {
     "jszip": "^3.10.1",
+    "onnxruntime-web": "^1.30.0",
     "pdf-lib": "^1.17.1",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"

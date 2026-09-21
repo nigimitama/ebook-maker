@@ -28,3 +28,7 @@ playwright/.cache
 *.njsproj
 *.sln
 *.sw?
+
+# OCR models (fetched by npm run fetch-models)
+public/models/
+public/config/

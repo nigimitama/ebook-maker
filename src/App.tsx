@@ -1,29 +1,36 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useBook } from './hooks/useBook'
+import { useOcr } from './hooks/useOcr'
 import { ImportPanel } from './components/ImportPanel'
 import { PageList } from './components/PageList'
 import { AdjustmentEditor } from './components/AdjustmentEditor'
+import { OcrReview } from './components/OcrReview'
 import { MetadataForm } from './components/MetadataForm'
 import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
-const STEPS = ['読み込み', '並べ替え・調整', '詳細＆書き出し'] as const
+const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', '詳細＆書き出し'] as const
 
 export function App() {
   const book = useBook()
   const selectedPage = book.pages.find((p) => p.id === book.selectedPageId)
   const [step, setStep] = useState(0)
   const [maxStep, setMaxStep] = useState(0)
+  // ページが削除・結合・取り消しされたら保存済みのOCR結果を読み直させる。
+  // 配列そのものを渡すと毎描画で別参照になるため、IDの並びで memo する。
+  const pageIds = useMemo(() => book.pages.map((p) => p.id), [book.pages])
+  const ocr = useOcr(book.getStore, { pageIds })
 
   function goTo(next: number) {
     setStep(next)
     setMaxStep((current) => Math.max(current, next))
   }
 
-  // 「並べ替え・調整」工程に入ったとき、まだ何も選ばれていなければ1ページ目を選ぶ。
+  // 「並べ替え・調整」「OCR確認・修正」工程に入ったとき、まだ何も選ばれていなければ
+  // 1ページ目を選ぶ。どちらの画面も選択中ページの画素(selectedImage)を描画する。
   useEffect(() => {
-    if (step !== 1) return
+    if (step !== 1 && step !== 2) return
     if (selectedPage) return
     const first = book.pages[0]
     if (first) void book.selectPage(first.id)
@@ -42,8 +49,13 @@ export function App() {
         error: book.error,
         importProgress: book.importProgress,
         canUndoClearAll: book.canUndoClearAll,
+        ocr: { running: ocr.running, progress: ocr.progress },
       }),
       goToStep: goTo,
+      runOcr: ocr.runOne,
+      runOcrAll: (opts) => ocr.runAll(pageIds, opts),
+      getOcr: (pageId) => ocr.results[pageId],
+      setOcrLineText: ocr.updateLine,
       importFiles: book.importFiles,
       selectPage: book.selectPage,
       updateAdjustment: book.updateAdjustment,
@@ -113,7 +125,11 @@ export function App() {
             {step === 1 && (
               <>
                 <button type="button" className="btn btn-primary" onClick={() => goTo(2)}>
-                  詳細情報へ進む
+                  OCRへ進む
+                </button>
+                {/* OCRは任意工程。使わない人がここで詰まらないよう、書き出しへ直行できる。 */}
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(3)}>
+                  OCRをスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
                   戻る
@@ -121,8 +137,18 @@ export function App() {
               </>
             )}
             {step === 2 && (
-              <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
-                ページ編集へ戻る
+              <>
+                <button type="button" className="btn btn-primary" onClick={() => goTo(3)}>
+                  詳細情報へ進む
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
+                  戻る
+                </button>
+              </>
+            )}
+            {step === 3 && (
+              <button type="button" className="btn btn-ghost" onClick={() => goTo(2)}>
+                OCR確認へ戻る
               </button>
             )}
           </div>
@@ -182,6 +208,18 @@ export function App() {
           )}
 
           {step === 2 && (
+            <OcrReview
+              pages={book.pages}
+              thumbnails={book.thumbnails}
+              selectedPageId={book.selectedPageId}
+              selectedImage={book.selectedImage}
+              onSelect={book.selectPage}
+              ocr={ocr}
+              title={book.metadata.title}
+            />
+          )}
+
+          {step === 3 && (
             <>
               <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
               <ExportPanel onExport={book.exportBook} title={book.metadata.title} />

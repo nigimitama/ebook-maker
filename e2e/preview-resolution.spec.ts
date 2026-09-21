@@ -47,7 +47,6 @@ test('previews are downscaled, not full-resolution originals', async ({ page }) 
   // サムネイルのクリックは拡大モーダルも開くので、続行前に閉じる。
   await page.locator('.page-list__thumb').first().click()
   await page.keyboard.press('Escape')
-  await page.getByText('調整へ進む').click()
   await expect(page.getByTestId('adjustment-canvas')).toBeVisible()
   await page.waitForFunction(() => {
     const canvas = document.querySelector(
@@ -73,8 +72,7 @@ test('export keeps the original resolution despite downscaled previews', async (
 
   await page.getByText('次へ', { exact: true }).click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
-  await page.getByText('調整へ進む').click()
-  await page.getByText('詳細情報へ進む').click()
+  await page.getByText('OCRをスキップして書き出しへ').click()
 
   await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([

@@ -12,8 +12,13 @@ function fakeApi(overrides: Partial<Omit<AutomationApi, 'describe'>> = {}): Omit
       error: null,
       importProgress: null,
       canUndoClearAll: false,
+      ocr: { running: false, progress: null },
     })),
     goToStep: vi.fn(),
+    runOcr: vi.fn(),
+    runOcrAll: vi.fn(),
+    getOcr: vi.fn(),
+    setOcrLineText: vi.fn(),
     importFiles: vi.fn(),
     selectPage: vi.fn(),
     updateAdjustment: vi.fn(),
@@ -56,5 +61,18 @@ describe('installAutomationApi', () => {
     const exposedMethods = Object.keys(fakeApi()).sort()
 
     expect(documentedMethods).toEqual(exposedMethods)
+  })
+
+  // 外部エージェントは describe() だけを見て操作するので、工程番号がずれたままだと
+  // 書き出し工程に行けない。OCR工程を含む0〜3を説明に載せる。
+  it('documents the OCR step in goToStep and the OCR operations', () => {
+    installAutomationApi(fakeApi())
+
+    const methods = window.EbookMaker!.describe().methods
+    expect(methods.goToStep).toContain('2:OCR確認・修正')
+    expect(methods.goToStep).toContain('3:詳細＆書き出し')
+    for (const name of ['runOcr', 'runOcrAll', 'getOcr', 'setOcrLineText'] as const) {
+      expect(methods[name]).toBeTruthy()
+    }
   })
 })

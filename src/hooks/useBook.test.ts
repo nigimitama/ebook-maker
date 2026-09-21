@@ -182,6 +182,28 @@ describe('useBook', () => {
     }
   })
 
+  it('exposes getStore and restores OCR results when undoing clear-all', async () => {
+    const view = await importPages([imageFile('a.png', [1, 2, 3, 255])])
+    const [page] = view.result.current.pages
+    const store = await view.result.current.getStore()
+    expect(store).not.toBeNull()
+    const ocr = {
+      pageId: page.id,
+      lines: [{ id: 'l', x: 0, y: 0, w: 1, h: 1, text: 'hi', edited: false }],
+      modelVersion: 't',
+      updatedAt: 1,
+    }
+    await store!.putOcr(ocr)
+    await act(async () => {
+      await view.result.current.clearAllPages()
+    })
+    expect(await store!.listOcr()).toEqual([])
+    await act(async () => {
+      await view.result.current.undoClearAll()
+    })
+    expect(await store!.listOcr()).toEqual([ocr])
+  })
+
   it('bakes each page’s adjustment into the pixels when merging a spread', async () => {
     const view = await importPages([
       imageFile('left.png', [10, 20, 30, 255]),

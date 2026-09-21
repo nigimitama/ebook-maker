@@ -31,13 +31,14 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.getByText('結合を確定').click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
 
-  // 並べ替え → 調整: 最初に取り込んだページが自動で選択され、
+  // 同じ工程で調整も行う: 最初に取り込んだページが自動で選択され、
   // スライダー操作で明るさ/コントラストを調整できる。
-  await page.getByText('調整へ進む').click()
   await expect(page.getByTestId('brightness-slider')).toBeVisible()
   await page.getByTestId('brightness-slider').fill('20')
 
-  // 調整 → 詳細&書き出し
+  // 並べ替え・調整 → OCR確認・修正 → 詳細&書き出し
+  await page.getByText('OCRへ進む').click()
+  await expect(page.getByText('このページをOCR')).toBeVisible()
   await page.getByText('詳細情報へ進む').click()
   await page.getByTestId('title-input').fill('E2E Test Book')
   await page.getByTestId('author-input').fill('E2E Author')
@@ -65,8 +66,8 @@ test('exports an EPUB with one xhtml/image pair per page', async ({ page }) => {
   await page.getByText('次へ', { exact: true }).click()
   await expect(page.getByRole('listitem')).toHaveCount(1)
 
-  await page.getByText('調整へ進む').click()
-  await page.getByText('詳細情報へ進む').click()
+  // OCRは任意工程なので飛ばして書き出せる。
+  await page.getByText('OCRをスキップして書き出しへ').click()
   await page.getByLabel('EPUB').click()
   await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([

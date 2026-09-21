@@ -1,3 +1,5 @@
+import type { RunOptions, RunSummary } from '../hooks/useOcr'
+import type { OcrResult } from './ocr/types'
 import type { AdjustmentParams, BookMetadata, PageEntry } from '../types'
 
 export interface AutomationPageSummary {
@@ -18,11 +20,19 @@ export interface AutomationState {
   error: string | null
   importProgress: { done: number; total: number } | null
   canUndoClearAll: boolean
+  ocr: {
+    running: boolean
+    progress: { done: number; total: number; stage?: string } | null
+  }
 }
 
 export interface AutomationApi {
   getState: () => AutomationState
   goToStep: (step: number) => void
+  runOcr: (pageId: string, opts?: RunOptions) => Promise<RunSummary>
+  runOcrAll: (opts?: RunOptions) => Promise<RunSummary>
+  getOcr: (pageId: string) => OcrResult | undefined
+  setOcrLineText: (pageId: string, lineId: string, text: string) => Promise<void>
   importFiles: (files: File[]) => Promise<void>
   selectPage: (id: string) => Promise<void>
   updateAdjustment: (id: string, adjustment: AdjustmentParams) => Promise<void>
@@ -49,8 +59,12 @@ export interface AutomationApiDescription {
 const API_DESCRIPTION: AutomationApiDescription = {
   name: 'ebook-maker automation API',
   methods: {
-    getState: '() => AutomationState — 現在の状態(工程・ページ一覧・選択中ページ・メタデータ・エラー等)をJSONで返す。',
-    goToStep: '(step: number) => void — 工程(0:読み込み, 1:並べ替え・調整, 2:詳細＆書き出し)を切り替える。',
+    getState: '() => AutomationState — 現在の状態(工程・ページ一覧・選択中ページ・メタデータ・エラー・OCRの実行状況等)をJSONで返す。',
+    goToStep: '(step: number) => void — 工程(0:読み込み, 1:並べ替え・調整, 2:OCR確認・修正, 3:詳細＆書き出し)を切り替える。OCRは任意工程で、2を飛ばして3に進んでもよい。',
+    runOcr: '(pageId: string, opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 1ページに文字認識をかける。修正済みの行があるページは見送られ、skippedEditedに入る(overwriteEdited: trueで上書き)。',
+    runOcrAll: '(opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 全ページに文字認識をかける。進捗は getState().ocr で確認できる。',
+    getOcr: '(pageId: string) => OcrResult | undefined — ページのOCR結果(行の並びが読み順)を返す。未実行ならundefined。',
+    setOcrLineText: '(pageId: string, lineId: string, text: string) => Promise<void> — OCR結果の1行の文字を修正する(修正済みとして保存される)。',
     importFiles: '(files: File[]) => Promise<void> — 画像ファイルをページとして読み込む。',
     selectPage: '(id: string) => Promise<void> — 編集対象のページを選択する。',
     updateAdjustment: '(id: string, adjustment: AdjustmentParams) => Promise<void> — ページの調整値(明るさ・コントラスト・リサイズ・画質)を更新する。',
