@@ -119,7 +119,8 @@ export function OcrReview({
 }: OcrReviewProps) {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
   const [addMode, setAddMode] = useState(false)
-  const [overwrite, setOverwrite] = useState<null | { kind: 'one' | 'all'; pageId: string | null; result?: OcrResult }>(null)
+  const [overwrite, setOverwrite] = useState<null | { kind: 'one' | 'all'; pageId: string | null }>(null)
+  const baseline = useRef<unknown>(undefined)
   const textareas = useRef<Map<string, HTMLTextAreaElement>>(new Map())
 
   const page = pages.find((p) => p.id === selectedPageId) ?? null
@@ -138,9 +139,7 @@ export function OcrReview({
     if (!page) return
     setOverwrite(null)
     const summary = opts ? await ocr.runOne(page.id, opts) : await ocr.runOne(page.id)
-    if (summary.skippedEdited.length > 0) {
-      setOverwrite({ kind: 'one', pageId: page.id, result: ocr.results[page.id] })
-    }
+    if (summary.skippedEdited.length > 0) setOverwrite({ kind: 'one', pageId: page.id })
   }
 
   async function runEveryPage(opts?: { overwriteEdited: true }) {
@@ -155,9 +154,17 @@ export function OcrReview({
   }
 
   // 対象ページの結果が(再実行・編集で)変わったら、古い確認は出さない。
-  const overwriteVisible =
-    overwrite !== null &&
-    (overwrite.kind === 'all' || ocr.results[overwrite.pageId ?? ''] === overwrite.result)
+  // 通知を出した時点(のコミット)の結果を基準にし、それ以降に変わったら消す。
+  // await をまたいで取った値とは比べない(最新のpropsを描画後に読む)。
+  const watched = overwrite?.kind === 'one' ? ocr.results[overwrite.pageId ?? ''] : ocr.results
+  const overwriteVisible = overwrite !== null
+  useEffect(() => {
+    baseline.current = overwrite ? watched : undefined
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overwrite])
+  useEffect(() => {
+    if (overwrite && watched !== baseline.current) setOverwrite(null)
+  }, [overwrite, watched])
 
   const stage = ocr.progress?.stage
   const progressLabel = stage && STAGE_LABEL[stage] ? STAGE_LABEL[stage] : '文字認識中'

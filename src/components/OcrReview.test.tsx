@@ -300,4 +300,42 @@ describe('OcrReview', () => {
     fireEvent.keyDown(screen.getByTestId('ocr-page-c'), { key: 'Enter' })
     expect(onSelect).toHaveBeenCalledWith('c')
   })
+
+  it('runOneが結果を差し替えてから skippedEdited を返しても確認が出て、上書き後の結果変化で消える', async () => {
+    const holder: { update?: (o: UseOcrResult) => void; ocr?: UseOcrResult } = {}
+    const swapped: OcrResult = { ...resultA, updatedAt: 5 }
+    const runOne = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        holder.update?.({ ...holder.ocr!, results: { a: swapped } })
+        return { skippedEdited: ['a'] }
+      })
+      .mockImplementationOnce(async () => {
+        holder.update?.({ ...holder.ocr!, results: { a: { ...swapped, updatedAt: 6 } } })
+        return { skippedEdited: [] }
+      })
+    const ocr = makeOcr({ results: { a: resultA }, runOne })
+    holder.ocr = ocr
+    holder.update = setup(ocr).update
+    fireEvent.click(screen.getByRole('button', { name: 'このページをOCR' }))
+    const btn = await screen.findByRole('button', { name: '修正済みの行があります。上書きして再実行' })
+    fireEvent.click(btn)
+    expect(runOne).toHaveBeenLastCalledWith('a', { overwriteEdited: true })
+    await waitFor(() =>
+      expect(screen.queryByRole('button', { name: '修正済みの行があります。上書きして再実行' })).toBeNull(),
+    )
+  })
+
+  it('全ページOCRでも結果が差し替わってから skippedEdited を返して確認が出る', async () => {
+    const holder: { update?: (o: UseOcrResult) => void; ocr?: UseOcrResult } = {}
+    const runAll = vi.fn().mockImplementationOnce(async () => {
+      holder.update?.({ ...holder.ocr!, results: { a: { ...resultA, updatedAt: 9 } } })
+      return { skippedEdited: ['a'] }
+    })
+    const ocr = makeOcr({ results: { a: resultA }, runAll })
+    holder.ocr = ocr
+    holder.update = setup(ocr).update
+    fireEvent.click(screen.getByRole('button', { name: '全ページをOCR' }))
+    expect(await screen.findByRole('button', { name: '修正済みの行があります。上書きして再実行' })).toBeInTheDocument()
+  })
 })
