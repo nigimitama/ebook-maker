@@ -27,6 +27,8 @@ export function App() {
   const ocr = useOcr(book.getStore, { pageIds })
   const chapters = useChapters(book.getStore, { pageIds })
 
+  const error = book.error ?? chapters.error
+
   function goTo(next: number) {
     setStep(next)
     setMaxStep((current) => Math.max(current, next))
@@ -62,8 +64,11 @@ export function App() {
       setChapters: chapters.setChapters,
       detectTocPages: () => detectTocPages(pageIds, ocr.results),
       parseToc: (tocPageIds, bodyStartPageId) => {
+        if (bodyStartPageId && !pageIds.includes(bodyStartPageId)) {
+          throw new Error(`bodyStartPageId が見つかりません: ${bodyStartPageId}`)
+        }
         const bodyStart = bodyStartPageId
-          ? Math.max(pageIds.indexOf(bodyStartPageId), 0)
+          ? pageIds.indexOf(bodyStartPageId)
           : defaultBodyStartIndex(pageIds, tocPageIds)
         return parseToc(tocPageIds, ocr.results, pageIds, bodyStart)
       },
@@ -92,10 +97,16 @@ export function App() {
   return (
     <div className="app-shell">
       <h1>ebook-maker</h1>
-      {book.error && (
+      {error && (
         <div role="alert" data-testid="error-banner" className="error-banner">
-          <span>{book.error}</span>
-          <button type="button" onClick={book.clearError}>
+          <span>{error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              book.clearError()
+              chapters.clearError()
+            }}
+          >
             閉じる
           </button>
         </div>
@@ -256,7 +267,7 @@ export function App() {
               ocrRunning={ocr.running}
               onRunOcr={(ids) => void ocr.runAll(ids, { skipDone: true })}
               chapters={chapters.chapters}
-              onChange={(next) => void chapters.setChapters(next)}
+              onChange={(next) => chapters.setChapters(next).catch(() => {})}
             />
           )}
 

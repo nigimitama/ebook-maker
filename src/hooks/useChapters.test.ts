@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { ImageStore } from '../lib/imageStore'
 import type { Chapter } from '../types'
@@ -58,6 +58,23 @@ describe('useChapters', () => {
     await waitFor(() => expect(result.current.chapters).toHaveLength(1))
     rerender({ ids: [] })
     await waitFor(() => expect(result.current.chapters).toEqual([]))
+  })
+
+  it('rejects and surfaces an error when the write fails, and later writes still work', async () => {
+    const { result } = setup(['a'])
+    const spy = vi.spyOn(store, 'putChapters').mockRejectedValueOnce(new Error('disk full'))
+    await act(async () => {
+      await expect(result.current.setChapters([ch('c1', 'a')])).rejects.toThrow('disk full')
+    })
+    expect(result.current.error).toContain('章立ての保存に失敗しました')
+    act(() => result.current.clearError())
+    expect(result.current.error).toBeNull()
+    spy.mockRestore()
+    await act(async () => {
+      await result.current.setChapters([ch('c2', 'a')])
+    })
+    expect((await store.listChapters()).map((c) => c.id)).toEqual(['c2'])
+    expect(result.current.error).toBeNull()
   })
 
   it('keeps an edit made just before a page deletion, and still remaps the chapter', async () => {

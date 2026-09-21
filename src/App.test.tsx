@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import { App } from './App'
 import * as useBookModule from './hooks/useBook'
+import * as useChaptersModule from './hooks/useChapters'
 import type { UseBookResult } from './hooks/useBook'
 
 function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
@@ -187,6 +188,27 @@ describe('App', () => {
     render(<App />)
     expect(screen.getByTestId('error-banner')).toHaveTextContent('読み込みに失敗しました: a.heic')
     expect(screen.getByRole('alert')).toBeInTheDocument()
+  })
+
+  it('shows the chapter save error in the banner and clears it with 閉じる', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
+    const clearError = vi.fn()
+    vi.spyOn(useChaptersModule, 'useChapters').mockReturnValue({
+      chapters: [],
+      setChapters: vi.fn(),
+      error: '章立ての保存に失敗しました: x',
+      clearError,
+    })
+    render(<App />)
+    expect(screen.getByTestId('error-banner')).toHaveTextContent('章立ての保存に失敗しました: x')
+    fireEvent.click(screen.getByText('閉じる'))
+    expect(clearError).toHaveBeenCalled()
+  })
+
+  it('parseToc throws for an unknown bodyStartPageId', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
+    render(<App />)
+    expect(() => window.EbookMaker?.parseToc([], 'no-such-id')).toThrow('no-such-id')
   })
 
   it('does not allow jumping to a step ahead of the furthest one reached via the rail', () => {

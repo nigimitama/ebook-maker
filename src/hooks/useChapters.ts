@@ -6,11 +6,22 @@ import type { Chapter } from '../types'
 export interface UseChaptersResult {
   chapters: Chapter[]
   setChapters: (next: Chapter[]) => Promise<void>
+  /** 保存に失敗したときのメッセージ。 */
+  error: string | null
+  clearError: () => void
 }
 
 export interface UseChaptersOptions {
   /** 現在のページID一覧(書籍順)。変わるたびに保存済みの章を読み直し、消えたページの章を寄せる。 */
   pageIds?: string[]
+}
+
+function describeSaveError(error: unknown): string {
+  if (typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'QuotaExceededError') {
+    return '章立ての保存に失敗しました: ストレージの空き容量が足りません'
+  }
+  const reason = error instanceof Error ? error.message : String(error)
+  return `章立ての保存に失敗しました: ${reason}`
 }
 
 function clampLevels(chapters: Chapter[]): Chapter[] {
@@ -23,6 +34,8 @@ export function useChapters(
 ): UseChaptersResult {
   const { pageIds } = options
   const [chapters, setChaptersState] = useState<Chapter[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const clearError = useCallback(() => setError(null), [])
   const getStoreRef = useRef(getStore)
   useEffect(() => {
     getStoreRef.current = getStore
@@ -63,7 +76,9 @@ export function useChapters(
         // 待っている間に編集された場合、その編集が最新の状態なので表示は上書きしない。
         if (mountedRef.current && editVersionRef.current === enqueuedVersion) setChaptersState(next)
       })
-      .catch(() => {})
+      .catch((e) => {
+        if (mountedRef.current) setError(describeSaveError(e))
+      })
   }, [pagesKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setChapters = useCallback(async (next: Chapter[]) => {
@@ -74,9 +89,12 @@ export function useChapters(
       const store = await getStoreRef.current()
       if (store) await store.putChapters(normalized)
     })
-    writeChainRef.current = write.catch(() => {})
+    // 列は失敗しても止めない。呼び出し側には reject を返し、表示用に error も立てる。
+    writeChainRef.current = write.catch((e) => {
+      if (mountedRef.current) setError(describeSaveError(e))
+    })
     await write
   }, [])
 
-  return { chapters, setChapters }
+  return { chapters, setChapters, error, clearError }
 }

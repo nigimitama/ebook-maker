@@ -32,7 +32,7 @@ OCR済みのページから目次を読み取り、章立てとして書き出�
 1. `runOcrAll()` などで目次ページをOCRしておく。
 2. `detectTocPages()` で目次ページを自動検出する(先頭の一部のページが対象)。
 3. `parseToc(tocPageIds, bodyStartPageId?)` で章の候補を得る。`bodyStartPageId` は
-   印刷ページ1ページ目に当たるページ(省略時は目次の最後の次)。候補は保存されない。
+   印刷ページ1ページ目に当たるページ(省略時は目次の最後の次。存在しないIDはエラーになる)。候補は保存されない。
 4. 内容を確認・修正して `setChapters(chapters)` で保存する。
 5. `exportBook('pdf' | 'epub')` で、章があればPDFのしおり・EPUBの目次に埋め込まれる。
    章を付けたくなければ `setChapters([])`。

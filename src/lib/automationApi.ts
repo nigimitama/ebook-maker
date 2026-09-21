@@ -69,7 +69,7 @@ const API_DESCRIPTION: AutomationApiDescription = {
     getChapters: '() => Chapter[] — 章立て({ id, title, pageId, level })を返す。levelは1=章, 2=節。配列順が書籍順(同一ページ内の順序も表す)。',
     setChapters: '(chapters: Chapter[]) => Promise<void> — 章立てを丸ごと置き換えて保存する。空配列で章立てなし。書き出し時、章があればPDFのしおり・EPUBの目次に埋め込まれる。',
     detectTocPages: '() => { pageIds: string[]; unscannedPageIds: string[] } — OCR結果から目次ページを自動検出する(先頭の一部のページが対象)。unscannedPageIdsは検出範囲内でOCR未実施のページ。',
-    parseToc: '(tocPageIds: string[], bodyStartPageId?: string) => Chapter[] — 指定した目次ページのOCR結果から章の候補を作って返す(保存しない)。bodyStartPageIdは印刷ページ1ページ目に当たるページ(省略時は目次の最後の次)。保存はsetChaptersで行う。',
+    parseToc: '(tocPageIds: string[], bodyStartPageId?: string) => Chapter[] — 指定した目次ページのOCR結果から章の候補を作って返す(保存しない)。bodyStartPageIdは印刷ページ1ページ目に当たるページ(省略時は目次の最後の次。存在しないIDはエラー)。保存はsetChaptersで行う。',
     runOcr: '(pageId: string, opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 1ページに文字認識をかける。修正済みの行があるページは見送られ、skippedEditedに入る(overwriteEdited: trueで上書き)。',
     runOcrAll: '(opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 全ページに文字認識をかける。進捗は getState().ocr で確認できる。',
     getOcr: '(pageId: string) => OcrResult | undefined — ページのOCR結果(行の並びが読み順)を返す。未実行ならundefined。',
