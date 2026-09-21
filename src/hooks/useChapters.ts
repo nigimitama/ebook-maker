@@ -31,7 +31,7 @@ export function useChapters(
   const prevIdsRef = useRef<string[] | null>(null)
   // 保存は直列にする。入力のたびに呼ばれるので、順序が入れ替わると古い値が残る。
   const writeChainRef = useRef<Promise<unknown>>(Promise.resolve())
-  // 読み込み中に編集された場合、古い読み込み結果で編集を上書きしないための世代番号。
+  // 読み込みを待つ間に編集された場合、古い読み込み結果で表示を上書きしないための世代番号。
   const editVersionRef = useRef(0)
 
   useEffect(() => {
@@ -46,21 +46,24 @@ export function useChapters(
     if (!pageIds) return
     const prev = prevIdsRef.current
     prevIdsRef.current = pageIds
-    const startVersion = editVersionRef.current
-    void (async () => {
-      const store = await getStoreRef.current()
-      if (!store || !mountedRef.current) return
-      if (editVersionRef.current !== startVersion) return
-      const stored = await store.listChapters()
-      const alive = new Set(pageIds)
-      // 前回のページ一覧が空(初回読み込み・全削除の取り消し)のときは、まだ全ページが
-      // 揃っていないだけの可能性があるので寄せない。寄せると章を誤って捨ててしまう。
-      const shouldRemap = prev !== null && prev.length > 0 && stored.some((c) => !alive.has(c.pageId))
-      const next = shouldRemap ? remapChapters(stored, prev ?? [], pageIds) : stored
-      if (editVersionRef.current !== startVersion) return
-      if (shouldRemap) await store.putChapters(next)
-      if (mountedRef.current) setChaptersState(next)
-    })().catch(() => {})
+    // 読み込みと寄せは保存と同じ直列の列に入れる。保留中の編集の保存より後に読むので、
+    // 古い章を読んで新しい編集を上書きすることがなく、寄せが飛ばされることもない。
+    const enqueuedVersion = editVersionRef.current
+    writeChainRef.current = writeChainRef.current
+      .then(async () => {
+        const store = await getStoreRef.current()
+        if (!store || !mountedRef.current) return
+        const stored = await store.listChapters()
+        const alive = new Set(pageIds)
+        // 前回のページ一覧が空(初回読み込み・全削除の取り消し)のときは、まだ全ページが
+        // 揃っていないだけの可能性があるので寄せない。寄せると章を誤って捨ててしまう。
+        const shouldRemap = prev !== null && prev.length > 0 && stored.some((c) => !alive.has(c.pageId))
+        const next = shouldRemap ? remapChapters(stored, prev ?? [], pageIds) : stored
+        if (shouldRemap) await store.putChapters(next)
+        // 待っている間に編集された場合、その編集が最新の状態なので表示は上書きしない。
+        if (mountedRef.current && editVersionRef.current === enqueuedVersion) setChaptersState(next)
+      })
+      .catch(() => {})
   }, [pagesKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const setChapters = useCallback(async (next: Chapter[]) => {

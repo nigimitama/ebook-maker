@@ -59,4 +59,20 @@ describe('useChapters', () => {
     rerender({ ids: [] })
     await waitFor(() => expect(result.current.chapters).toEqual([]))
   })
+
+  it('keeps an edit made just before a page deletion, and still remaps the chapter', async () => {
+    await store.putChapters([ch('c1', 'b')])
+    const { result, rerender } = setup(['a', 'b', 'c'])
+    await waitFor(() => expect(result.current.chapters).toHaveLength(1))
+    let pending: Promise<void>
+    act(() => {
+      pending = result.current.setChapters([{ ...ch('c1', 'b'), title: '編集後' }])
+    })
+    rerender({ ids: ['a', 'c'] })
+    await act(async () => {
+      await pending
+    })
+    await waitFor(() => expect(result.current.chapters[0]).toMatchObject({ title: '編集後', pageId: 'c' }))
+    expect((await store.listChapters())[0]).toMatchObject({ title: '編集後', pageId: 'c' })
+  })
 })
