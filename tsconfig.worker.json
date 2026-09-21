@@ -7,7 +7,9 @@
        rather than living in tsconfig.app.json. */
     "lib": ["ES2023", "WebWorker"],
     "module": "esnext",
-    "types": [],
+    /* vite/client は ocrWorker の `?url` import と import.meta.env の型のために
+       必要。vite/client は DOM lib を参照しないので WebWorker lib と併用できる。 */
+    "types": ["vite/client"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -24,5 +26,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src/workers/exportWorker.ts"]
+  "include": ["src/workers/exportWorker.ts", "src/workers/ocrWorker.ts"]
 }
