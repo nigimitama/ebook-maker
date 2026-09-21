@@ -5,12 +5,17 @@ import { DEFAULT_JPEG_QUALITY } from '../types'
 import type { AdjustmentParams, PageEntry, RawImage } from '../types'
 
 // サムネイルは無加工の原本(thumbBlobId)なので、一覧でも調整の効果が一目で
-// わかるようCSSフィルタで近似表示する。書き出し時のピクセル演算(applyAdjustment)
-// とは別物で、あくまで見た目のプレビュー用。
+// わかるようフィルタで表示する。applyAdjustmentと同じ式
+// out = (x-128)*factor + 128 + brightness を、SVGの線形変換(slope/intercept)で再現する。
+// CSSのbrightness()は乗算でオフセット加算にならず、暗く見えてしまうため使わない。
 function adjustmentPreviewStyle(adjustment: AdjustmentParams): CSSProperties {
-  const contrastFactor = (100 + adjustment.contrast) / 100
-  const brightnessFactor = 1 + adjustment.brightness / 100
-  return { filter: `contrast(${contrastFactor}) brightness(${brightnessFactor})` }
+  const factor = (100 + adjustment.contrast) / 100
+  const intercept = 0.5 - 0.5 * factor + adjustment.brightness / 255
+  const fn = `type='linear' slope='${factor}' intercept='${intercept}'`
+  const svg =
+    `<svg xmlns='http://www.w3.org/2000/svg'><filter id='a' color-interpolation-filters='sRGB'>` +
+    `<feComponentTransfer><feFuncR ${fn}/><feFuncG ${fn}/><feFuncB ${fn}/></feComponentTransfer></filter></svg>`
+  return { filter: `url("data:image/svg+xml,${encodeURIComponent(svg)}#a")` }
 }
 
 interface AdjustedPreviewProps {
