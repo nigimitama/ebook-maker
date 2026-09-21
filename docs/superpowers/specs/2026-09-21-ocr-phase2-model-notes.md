@@ -89,4 +89,35 @@ export type RecognizerKey = keyof typeof OCR_CONFIG.recognizers // 30 | 50 | 100
 | (参考・不使用) 旧16px parseq-ndl-100.onnx | 同上 | 712c7184a0a80a9048a5aefbfacd63876bacfb1c8d4d2f5c252dc39ad12bc3dd |
 
 ## Residual risk
-202604 版 PARSeq 3モデルは上流作者の個人 R2 バケットにのみ存在し、ファイル単位のライセンス表記がない(親リポジトリの CC BY 4.0 と README の派生記載に依拠)。再学習に使った tegaki3 データの権利も未記載。R2 が消えても困らないよう自サイト同梱(自前ホスト)を維持し、SHA-256 で同一性を確認すること。
+**解決済み(フェーズ3)**: 以下は当時(フェーズ2)の記録。現在は NDL公式リポジトリ `ndl-lab/ndlocr-lite` の固定コミット `d25e0d4…` を取得元とし、個人バケットへの依存は解消した(SHA-256一致を確認、経緯は [ADR](2026-09-21-model-hosting-decision.md) と下の「公式ソース」)。ONNX単位のライセンス明記がない点はADRの解釈に依拠する。
+
+当時の記録: 202604 版 PARSeq 3モデルは上流作者の個人 R2 バケットにのみ存在し、ファイル単位のライセンス表記がない(親リポジトリの CC BY 4.0 と README の派生記載に依拠)。再学習に使った tegaki3 データの権利も未記載。R2 が消えても困らないよう自サイト同梱(自前ホスト)を維持し、SHA-256 で同一性を確認すること。
+
+## 公式ソース(フェーズ3 Task 0 で実測、2026-09-21)
+固定コミット `d25e0d415b607ad44459ca6b95c7512a54363935` の `ndl-lab/ndlocr-lite`。ベースURL: `https://raw.githubusercontent.com/ndl-lab/ndlocr-lite/d25e0d415b607ad44459ca6b95c7512a54363935`。4モデルとも上表のSHA-256・サイズに**完全一致**(curlで取得しsha256sumで実測。GitHub Contents API の size とも一致)。
+
+| ファイル | URL(ベース + パス) | サイズ (B) | SHA-256 |
+|---|---|---|---|
+| deim-s-1024x1024.onnx | /src/model/deim-s-1024x1024.onnx | 40,256,763 | c156ce0c4e704bc3bf7e4016d0a87b949cffa8b3724f4b4cc696b8284c3c7373 |
+| parseq-ndl-24x256-30-…-202604.onnx | /src/model/parseq-ndl-24x256-30-tiny-189epoch-tegaki3-r8data-202604.onnx | 36,457,393 | 9e651bae4c1a4d5254da1127e86e82e21ef62d5339b37e62d4a3d3d30831772d |
+| parseq-ndl-24x384-50-…-202604.onnx | /src/model/parseq-ndl-24x384-50-tiny-300epoch-tegaki3-r8data-202604.onnx | 37,808,553 | 49cea9db4552f19eb05c8ee202fcf74714977749b2f4c9376b127fde41b07a99 |
+| parseq-ndl-24x768-100-…-202604.onnx | /src/model/parseq-ndl-24x768-100-tiny-153epoch-tegaki3-r8data-202604.onnx | 42,588,187 | 06462b0dbd5b0b8508545c8c3d485cf20dbf4ffa652fe145e69c9e7457080602 |
+| NDLmoji.yaml (公式) | /src/config/NDLmoji.yaml | 42,434 | f6ad5a2de444b495155866af811cf1a98309dcae3225db802767ea531a2dc529 |
+| ndl.yaml (公式、クラス名一覧のみ。使用しない) | /src/config/ndl.yaml | 299 | 0c2a6a184dd322375b76f2ce3842f8ac555d53edad0ab63655c013f4c471c5a0 |
+
+### NDLmoji.yaml: 公式版と現行版(ndlocrlite-web@50216cc)の差
+- 現行(`https://raw.githubusercontent.com/yuta1984/ndlocrlite-web/50216cc/public/config/NDLmoji.yaml`): 42,426 B、SHA-256 `775eb37e6b09ad0a97b762d48c916c60e7ce8879a4628ddb190ce037d0a15772`。(本ブランチの `public/config/` は gitignore でありワークツリーに実体が無いため、`fetch-models.mjs` が取得するのと同じURLを再取得して計測した。以前の記録の 42,430 B とは一致しない。)
+- 両者とも `charset_train` は **Unicodeコードポイントで 7141 文字**(JSON.parse後 `[...s].length`)。以前の「公式7145文字」は UTF-16 コードユニット計測の誤り(公式版は BMP 外の文字を4つ含み 7141+4=7145)。
+- 差異は0始まりの文字位置で**4か所のみ**。公式の文字が現行では U+3013(〓、下駄記号)に置き換わっている:
+
+| 位置 | 公式 | 現行 |
+|---|---|---|
+| 7081 | U+2231E | U+3013 |
+| 7111 | U+2437D | U+3013 |
+| 7116 | U+26F94 | U+3013 |
+| 7127 | U+20BB7 | U+3013 |
+
+  現行版は U+3013 が計4回出現し重複を持つ(公式は重複なし)。文字集合の差は「公式のみ: 上記4文字 / 現行のみ: U+3013」。語彙サイズ 7142 = 7141 + EOS はどちらでも整合する。3・4行目以外(`charset_test` 行を除く他の行)に差は無い。
+
+**決定(フェーズ3 Task 1): 公式版を採用**。両方の yaml で `kumonoito.png` の実機スモーク(Chromium ヘッドレス、実モデル4本)を通し、25行の認識テキストが**完全に一致**した(出力の SHA-256 も一致)。よって取得元を公式に統一し、`modelFiles.mjs` に公式版のハッシュ `f6ad5a2d…` を記録した。現行版は重複トークン(U+3013 が4つ)を持つぶん id が曖昧なので、公式版のほうが素性が良い。
+  なお公式版は BMP 外の文字を4つ含むため、`charset` を **UTF-16 コードユニットで数えると 7145** になる(コードポイントでは 7141)。`parseCharset` は `Array.from` でコードポイント配列にしており `decodeSequence` はその配列を `id-1` で引くので id ずれは起きない(`recognizePost.test.ts` に U+2231E の回帰テストを追加済み)。

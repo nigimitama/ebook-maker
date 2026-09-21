@@ -363,7 +363,7 @@ export function OcrReview({
         >
           CC BY 4.0
         </a>
-        ) を元にした ndlocrlite-web のモデルを使用
+        ) のモデルを ONNX 形式のまま配信
       </p>
     </div>
   )

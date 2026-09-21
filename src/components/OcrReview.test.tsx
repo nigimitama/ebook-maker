@@ -188,6 +188,8 @@ describe('OcrReview', () => {
   it('出典表記がある', () => {
     setup(makeOcr())
     expect(screen.getByText(/NDLOCR-Lite/)).toHaveTextContent(/NDLOCR-Lite \(\s*CC BY 4\.0\s*\)/)
+    expect(screen.getByText(/NDLOCR-Lite/)).toHaveTextContent(/\) のモデルを ONNX 形式のまま配信/)
+    expect(screen.getByText(/NDLOCR-Lite/)).not.toHaveTextContent(/ndlocrlite-web/)
     const link = screen.getByRole('link', { name: /CC BY 4\.0/ })
     expect(link).toHaveAttribute('href', 'https://creativecommons.org/licenses/by/4.0/deed.ja')
     expect(link).toHaveAttribute('rel', 'noopener noreferrer')

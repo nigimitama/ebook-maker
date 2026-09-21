@@ -42,6 +42,15 @@ describe('decodeSequence', () => {
     const kana = ['あ', 'い', 'う', 'え']
     expect(decodeSequence(logitsFor([4, 4]), 2, vocab, kana)).toBe('ええ')
   })
+  // 公式NDLmoji.yamlはBMP外(サロゲートペア)の文字を4つ含む。charsetをUTF-16単位で
+  // 数えるとサロゲートペア以降のidが1つずれて静かに誤認識になるので、
+  // コードポイント単位の配列を id-1 で引けていることを固定する。
+  it('BMP外の文字(U+2231E)もidずれなく引ける', () => {
+    const charset = parseCharset('model:\n  charset_train: "xyz\\ud848\\udf1eあ"\n')
+    expect(charset).toEqual(['x', 'y', 'z', '\u{2231E}', 'あ'])
+    // BMP外文字に割り当たったid(=index+1)がその文字に、次のidが後続文字になる
+    expect(decodeSequence(logitsFor([4, 5]), 2, vocab, charset)).toBe('\u{2231E}あ')
+  })
   it('charsetの範囲外idは無視する', () => {
     const l = new Float32Array(2 * 8)
     l[7] = 5

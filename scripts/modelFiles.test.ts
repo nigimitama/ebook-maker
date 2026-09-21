@@ -15,7 +15,35 @@ describe('verifyHash', () => {
   it('期待値 null は検証しない', () => {
     expect(verifyHash(buf, null)).toBe(true)
   })
-  it('MODEL_FILES は 5 件', () => {
-    expect(MODEL_FILES).toHaveLength(5)
+})
+
+describe('MODEL_FILES', () => {
+  type Entry = { dest: string; sha256: string | null; sources: string[] }
+  const entries = MODEL_FILES as Entry[]
+
+  it('全エントリが sources を1つ以上持つ', () => {
+    expect(entries.length).toBeGreaterThan(0)
+    for (const f of entries) {
+      expect(f.sources.length, f.dest).toBeGreaterThanOrEqual(1)
+      for (const url of f.sources) expect(url, f.dest).toMatch(/^https:\/\//)
+    }
+  })
+  it('全エントリが64桁hexの sha256 と1つ以上の sources を持つ', () => {
+    for (const f of entries) {
+      expect(f.sha256, f.dest).toMatch(/^[0-9a-f]{64}$/)
+      expect(f.sources.length, f.dest).toBeGreaterThanOrEqual(1)
+    }
+  })
+  it('モデル(.onnx)4本は64桁hexの sha256 を持つ', () => {
+    const models = entries.filter((f) => f.dest.endsWith('.onnx'))
+    expect(models).toHaveLength(4)
+    for (const f of models) expect(f.sha256, f.dest).toMatch(/^[0-9a-f]{64}$/)
+  })
+  it('NDLmoji.yaml も64桁hexの sha256 を記録している(公式版を採用)', () => {
+    const yaml = entries.find((f) => f.dest.endsWith('NDLmoji.yaml'))
+    expect(yaml?.sha256).toMatch(/^[0-9a-f]{64}$/)
+  })
+  it('個人R2バケットを参照しない', () => {
+    for (const f of entries) for (const url of f.sources) expect(url).not.toContain('r2.dev')
   })
 })

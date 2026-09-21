@@ -41,11 +41,13 @@ npm run lint       # oxlint
 
 ## OCRモデルの出典・ライセンス・帰属表示
 
-本機能は国立国会図書館 NDLOCR-Lite (https://github.com/ndl-lab/ndlocr-lite, CC BY 4.0) のレイアウト検出・文字認識モデルおよび文字セットを利用し、ndlocrlite-web (Yuta Hashimoto, CC BY 4.0, https://github.com/yuta1984/ndlocrlite-web) の再学習済み文字認識モデルを、ONNX 形式のまま自サイトから配信しています。
+本機能は国立国会図書館 NDLOCR-Lite (https://github.com/ndl-lab/ndlocr-lite, CC BY 4.0) のレイアウト検出・文字認識モデル(202604 の PARSeq は公式リポジトリの ver1.2)および文字セット `NDLmoji.yaml` を、固定コミット `d25e0d415b607ad44459ca6b95c7512a54363935` から取得し、ONNX 形式のまま自サイトから配信しています。文字セットは公式版に切り替えました(プレースホルダだった箇所が希少CJK文字4字になります)。ブラウザ側のパイプラインは ndlocrlite-web (Yuta Hashimoto, CC BY 4.0, https://github.com/yuta1984/ndlocrlite-web) をWeb実装の参考にしており(本アプリのコードは独自実装)、DEIMv2 の第2取得元としても同リポジトリを使います。
 
-なお、再学習済みの文字認識モデル(202604版)は上流作者の個人バケットでのみ配布され、ファイル単位のライセンス表記がなく、再学習データの権利も未記載である点が残存リスクです。
+モデルはNDL公式リポジトリ `ndl-lab/ndlocr-lite` の固定コミット `d25e0d415b607ad44459ca6b95c7512a54363935` から取得します(以前使っていたファイルとバイト単位で同一で、SHA-256で検証済み)。文字セットも公式の `NDLmoji.yaml` を採用しています。個人バケットへの依存はありません。
 
-モデルは `npm run fetch-models` で取得します(SHA-256検証あり、git管理外)。
+ライセンスの解釈に関する注意: 公式リポジトリ全体は CC BY 4.0 ですが、ONNXモデルファイルが明示的に列挙されているわけではありません。判断の経緯は [モデル配布元の判断(ADR)](docs/superpowers/specs/2026-09-21-model-hosting-decision.md) を参照してください。
+
+モデルは `npm run fetch-models` で取得します(git管理外)。取得元を順に試し、各ファイルのSHA-256を検証します(DEIMv2は第2ソースとして ndlocrlite-web@50216cc も持ちます)。`npm run mirror-models` は将来のCloudflare R2ミラー用で、既定はdry-runです(実行には環境変数 `R2_BUCKET` が必要)。現時点ではまだ使っていません。
 
 ## OCR機能の使い方と注意
 
@@ -60,5 +62,9 @@ npm run lint       # oxlint
 
 - OCRのテキストはまだPDF/EPUBには埋め込まれません(今後の課題)。
 - 枠の追加はマウス/タッチのドラッグのみで、キーボードだけでは追加できません。
-- 文字認識モデルは上流作者の個人バケットが出所というリスクがあります。詳細は [モデル調査メモ](docs/superpowers/specs/2026-09-21-ocr-phase2-model-notes.md) を参照。
-- 【次フェーズの課題】モデルを NDLOCR-Lite から自分で取得し、自前のR2バケット等から配布できるようにする(個人バケット依存の解消)。
+- モデルの出典とライセンス解釈の詳細は [モデル調査メモ](docs/superpowers/specs/2026-09-21-ocr-phase2-model-notes.md) を参照。
+
+## 今後の課題
+
+- Cloudflare R2 バケット・APIトークン・GitHub Secrets の作成(オーナー作業、フェーズ3 Task 3)。
+- R2ミラーを `fetch-models` のフォールバックソースにする(Secrets がある場合のみ)、および取得元の死活確認を行う週次ワークフローの追加(フェーズ3 Task 4)。次のPRで対応予定です。
