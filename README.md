@@ -14,10 +14,17 @@
 - タイトル・著者のメタデータ入力
 - PDF / EPUB(固定レイアウト・画像埋め込み型)の書き出し
 
+操作は3工程(1. 読み込み → 2. 並べ替え・調整 → 3. 詳細&書き出し)で進みます。
+
 ## 技術スタック
 
 React + TypeScript + Vite / Canvas 2D API / pdf-lib / JSZip / IndexedDB。
 書き出し処理はWeb Worker上で実行され、UIをブロックしません。
+
+## エージェント向け自動操作API
+
+ページは `window.EbookMaker` としてJS APIを公開しており、`describe()` でメソッド一覧、`getState()` で現在の状態を取得できます。
+詳細は `public/llms.txt` と `src/lib/automationApi.ts` を参照してください。
 
 ## コマンド
 
