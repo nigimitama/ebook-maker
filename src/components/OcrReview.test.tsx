@@ -70,6 +70,7 @@ function setup(ocr: UseOcrResult, selectedPageId = 'a') {
       selectedImage={{ data: new Uint8ClampedArray(4 * 10 * 20), width: 10, height: 20 }}
       onSelect={onSelect}
       ocr={o}
+      title="我輩は猫"
     />
   )
   const { rerender } = render(ui(ocr))
@@ -337,5 +338,30 @@ describe('OcrReview', () => {
     holder.update = setup(ocr).update
     fireEvent.click(screen.getByRole('button', { name: '全ページをOCR' }))
     expect(await screen.findByRole('button', { name: '修正済みの行があります。上書きして再実行' })).toBeInTheDocument()
+  })
+
+  it('「テキストを保存(.txt)」は結果が無ければ無効、あればBlobをダウンロードする', async () => {
+    setup(makeOcr())
+    expect(screen.getByRole('button', { name: 'テキストを保存(.txt)' })).toBeDisabled()
+  })
+
+  it('結果があると .txt をタイトル名でダウンロードし、URLを解放する', async () => {
+    const create = vi.fn().mockReturnValue('blob:txt')
+    const revoke = vi.fn()
+    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke })
+    const clicked: string[] = []
+    const spy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+      clicked.push(this.download)
+    })
+    setup(makeOcr({ results: { a: resultA } }))
+    const btn = screen.getByRole('button', { name: 'テキストを保存(.txt)' })
+    expect(btn).toBeEnabled()
+    fireEvent.click(btn)
+    expect(create).toHaveBeenCalledTimes(1)
+    const blob = create.mock.calls[0][0] as Blob
+    expect(await blob.text()).toBe('一行目\n二行目\n三行目')
+    expect(clicked).toEqual(['我輩は猫.txt'])
+    expect(revoke).toHaveBeenCalledWith('blob:txt')
+    spy.mockRestore()
   })
 })

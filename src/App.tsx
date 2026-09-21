@@ -215,6 +215,7 @@ export function App() {
               selectedImage={book.selectedImage}
               onSelect={book.selectPage}
               ocr={ocr}
+              title={book.metadata.title}
             />
           )}
 
