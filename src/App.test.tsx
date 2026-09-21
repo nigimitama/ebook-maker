@@ -212,6 +212,8 @@ describe('App', () => {
       { id: 'a', order: 0, fileName: undefined, width: 10, height: 10, adjustment: page.adjustment },
     ])
     expect(state?.selectedPageId).toBe('a')
+    expect(state?.chapters).toEqual([])
+    expect(window.EbookMaker?.getChapters()).toEqual([])
 
     act(() => window.EbookMaker?.goToStep(1))
     expect(screen.getByText('見開き結合')).toBeInTheDocument()

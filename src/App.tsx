@@ -8,6 +8,8 @@ import { OcrReview } from './components/OcrReview'
 import { MetadataForm } from './components/MetadataForm'
 import { useChapters } from './hooks/useChapters'
 import { ChaptersStep } from './components/ChaptersStep'
+import { detectTocPages } from './lib/toc/detectTocPages'
+import { defaultBodyStartIndex, parseToc } from './lib/toc/parseToc'
 import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
@@ -53,8 +55,18 @@ export function App() {
         importProgress: book.importProgress,
         canUndoClearAll: book.canUndoClearAll,
         ocr: { running: ocr.running, progress: ocr.progress },
+        chapters: chapters.chapters,
       }),
       goToStep: goTo,
+      getChapters: () => chapters.chapters,
+      setChapters: chapters.setChapters,
+      detectTocPages: () => detectTocPages(pageIds, ocr.results),
+      parseToc: (tocPageIds, bodyStartPageId) => {
+        const bodyStart = bodyStartPageId
+          ? Math.max(pageIds.indexOf(bodyStartPageId), 0)
+          : defaultBodyStartIndex(pageIds, tocPageIds)
+        return parseToc(tocPageIds, ocr.results, pageIds, bodyStart)
+      },
       runOcr: ocr.runOne,
       runOcrAll: (opts) => ocr.runAll(pageIds, opts),
       getOcr: (pageId) => ocr.results[pageId],

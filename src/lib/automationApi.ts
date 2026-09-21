@@ -1,6 +1,6 @@
 import type { RunOptions, RunSummary } from '../hooks/useOcr'
 import type { OcrResult } from './ocr/types'
-import type { AdjustmentParams, BookMetadata, PageEntry } from '../types'
+import type { AdjustmentParams, BookMetadata, Chapter, PageEntry } from '../types'
 
 export interface AutomationPageSummary {
   id: string
@@ -24,11 +24,16 @@ export interface AutomationState {
     running: boolean
     progress: { done: number; total: number; stage?: string } | null
   }
+  chapters: Chapter[]
 }
 
 export interface AutomationApi {
   getState: () => AutomationState
   goToStep: (step: number) => void
+  getChapters: () => Chapter[]
+  setChapters: (chapters: Chapter[]) => Promise<void>
+  detectTocPages: () => { pageIds: string[]; unscannedPageIds: string[] }
+  parseToc: (tocPageIds: string[], bodyStartPageId?: string) => Chapter[]
   runOcr: (pageId: string, opts?: RunOptions) => Promise<RunSummary>
   runOcrAll: (opts?: RunOptions) => Promise<RunSummary>
   getOcr: (pageId: string) => OcrResult | undefined
@@ -60,7 +65,11 @@ const API_DESCRIPTION: AutomationApiDescription = {
   name: 'ebook-maker automation API',
   methods: {
     getState: '() => AutomationState — 現在の状態(工程・ページ一覧・選択中ページ・メタデータ・エラー・OCRの実行状況等)をJSONで返す。',
-    goToStep: '(step: number) => void — 工程(0:読み込み, 1:並べ替え・調整, 2:OCR確認・修正, 3:詳細＆書き出し)を切り替える。OCRは任意工程で、2を飛ばして3に進んでもよい。',
+    goToStep: '(step: number) => void — 工程(0:読み込み, 1:並べ替え・調整, 2:OCR確認・修正, 3:章立て, 4:詳細＆書き出し)を切り替える。OCRと章立ては任意工程で、飛ばして4に進んでもよい。',
+    getChapters: '() => Chapter[] — 章立て({ id, title, pageId, level })を返す。levelは1=章, 2=節。配列順が書籍順(同一ページ内の順序も表す)。',
+    setChapters: '(chapters: Chapter[]) => Promise<void> — 章立てを丸ごと置き換えて保存する。空配列で章立てなし。書き出し時、章があればPDFのしおり・EPUBの目次に埋め込まれる。',
+    detectTocPages: '() => { pageIds: string[]; unscannedPageIds: string[] } — OCR結果から目次ページを自動検出する(先頭の一部のページが対象)。unscannedPageIdsは検出範囲内でOCR未実施のページ。',
+    parseToc: '(tocPageIds: string[], bodyStartPageId?: string) => Chapter[] — 指定した目次ページのOCR結果から章の候補を作って返す(保存しない)。bodyStartPageIdは印刷ページ1ページ目に当たるページ(省略時は目次の最後の次)。保存はsetChaptersで行う。',
     runOcr: '(pageId: string, opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 1ページに文字認識をかける。修正済みの行があるページは見送られ、skippedEditedに入る(overwriteEdited: trueで上書き)。',
     runOcrAll: '(opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 全ページに文字認識をかける。進捗は getState().ocr で確認できる。',
     getOcr: '(pageId: string) => OcrResult | undefined — ページのOCR結果(行の並びが読み順)を返す。未実行ならundefined。',
