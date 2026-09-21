@@ -1,6 +1,6 @@
 # OCR Phase2 モデル調査結果 (2026-09-21)
 
-出典: yuta1984/ndlocrlite-web (commit 50216cc) のソースと、実モデルを onnxruntime-node で検査した結果。食い違いは実測を正とした。
+出典: yuta1984/ndlocrlite-web を commit 50216cc に固定(以降 `upstream@50216cc`。上流参照は全てこの版) のソースと、実モデルを onnxruntime-node で検査した結果。食い違いは実測を正とした。
 
 ## 結論 (食い違いの解消)
 - DEIM 入力: **800x800** (ファイル名は 1024x1024 だが実体は 800)。`im_shape` 相当は `[800,800]` int64。
@@ -12,7 +12,7 @@
 - outputs: `labels` int64 (class id, **1 始まり**) / `boxes` float32 [1,N,4] (x1,y1,x2,y2) / `scores` float32 [1,N] / `char_count` int64 (実測は int64。上流コードは Float32Array として読むが値は 1/2/3)
 - 前処理: 長辺 maxWH の正方形に**左上寄せ**で黒(0,0,0)パディングし 800x800 にリサイズ(scale=800/maxWH)。NCHW、RGB、ImageNet 正規化 mean=[123.675,116.28,103.53] std=[58.395,57.12,57.375] (0-255 値に対し (v-mean)/std)。
 - 後処理: score >= 0.3。class = label-1。座標は x maxWH/800 倍で元画像へ。行クラス(0始まり) {1,2,3,4,5,16}=line_main/caption/ad/note/note_tochu/title、0=text_block(段境界)。行bboxは上下 2% 拡張、幅/高さ 10px 未満は捨てる。行に対し IoU 0.5 の NMS。
-- **文字数カテゴリ**: 出力4本目 `char_count`(1/2/3)。3 -> ≤30文字モデル、2 -> ≤50文字モデル、それ以外(1、欠落時100) -> ≤100文字モデル。
+- **文字数カテゴリ**: 出力4本目 `char_count`(1/2/3)。**dtype は int64 なので `BigInt64Array` として読み `Number()` で変換する(Float32Array で読んではならない。上流コードは Float32Array で読んでいるが実モデルの型と不整合)**。3 -> ≤30文字モデル、2 -> ≤50文字モデル、それ以外(1、欠落時100) -> ≤100文字モデル。
 
 ## PARSeq (採用: 202604 版, 24px)
 | 用途 | ファイル名 | サイズ | input `images` | output |
@@ -24,8 +24,16 @@
 (旧16px版が上流 public/models に同梱: parseq-ndl-30/50/100.onnx = 35,848,117 / 36,920,058 / 40,984,184 B、shape は高さ16、出力名 13469/21189/40488。使わない。)
 - 出力名は数値でビルド依存のため `session.outputNames[0]` で取ること。
 - 前処理: 縦長(h>w)は反時計回り 90 度回転。(W,H)へ単純リサイズ(アスペクト無視)。NCHW RGB、v/255 して `2*(v-0.5)` ([-1,1])。
-- デコード: logits [1,seq,7142] を位置ごとに argmax。id0=EOS で終了、id 1-3 (<s>,</s>,<pad>) はスキップ、それ以外は charList[id-1]。連続重複は除去(上流の挙動)。語彙 7142 = 特殊4 + 文字7141 の想定(上流実装は id<4 を全てスキップし id-1 で引く。charList[0..2] は到達不能になる点は上流と同じ挙動として踏襲)。
-- 特殊トークンID: EOS=0, BOS=1, ... (上流の判定は `0` で終了、`<4` スキップ)。
+- デコード: logits [1,seq,7142] を位置ごとに argmax。id0=EOS で終了、id1〜3 はスキップ、それ以外は `charList[id-1]`。
+- 特殊トークンID: **EOS=0(出現したら打ち切り)、id1〜3(上流コメントでは <s>=1, </s>=2, <pad>=3)は一括スキップ**。上流は 0 を EOS としつつ 2 も </s> とコメントしており個別割当が不整合なので、実装は「0で終了、1〜3スキップ」とだけ定義し個別割当に依存しない。
+- **KNOWN LIMITATION(要注意): `charList[id-1]` の写像を維持すると、文字リスト先頭3文字(半角スペース、`!`、`"`)は id1〜3 がスキップされるため出力不能(charList[0..2] は到達不能)。語彙7142=特殊4+文字7141 なら正しい写像は `charList[id-4]` の可能性があるが、実機での既知画像による検証は未実施のため、上流の写像(id-1)をそのまま踏襲する。Task 3 の実機確認でずれが見つかれば修正すること。**
+- **連続重複の除去は行わない(決定)**: PARSeq は CTC ではなく、同一文字の連続(「ああ」「々々」「ll」等)は正当な出力。上流は連続重複を除去するが、これは文字欠落を起こすため我々は意図的に逸脱する。
+
+## 前処理の比較
+| モデル | リサイズ | 色/正規化 |
+|---|---|---|
+| DEIM | 長辺に合わせ左上寄せ黒パディングで 800x800 (アスペクト維持) | RGB, (v-mean)/std, mean=[123.675,116.28,103.53] std=[58.395,57.12,57.375] |
+| PARSeq | 縦長は反時計回り90度回転後、(W,H)へ単純リサイズ (アスペクト無視) | RGB, 2*(v/255-0.5) で [-1,1] |
 
 ## NDLmoji.yaml
 - キー: `model.charset_train` (二重引用符 YAML スカラー、\" と \ のエスケープあり)。`model.charset_test` も同一の 7141 文字。`text_recognition` キーは存在しない(上流の分岐は空振り)。
@@ -42,29 +50,42 @@ model:
 ```ts
 export const OCR_CONFIG = {
   layout: {
-    file: 'deim-s-1024x1024.onnx',
-    inputSize: 800,
-    mean: [123.675, 116.28, 103.53], std: [58.395, 57.12, 57.375],
+    url: 'models/deim-s-1024x1024.onnx', // サイト相対
+    inputSize: 800, // ファイル名は1024だが実体は800
     scoreThreshold: 0.3, nmsIou: 0.5, lineBoxPadRatio: 0.02, minBoxPx: 10,
+    mean: [123.675, 116.28, 103.53], std: [58.395, 57.12, 57.375],
     lineClassIds: [1, 2, 3, 4, 5, 16], blockClassId: 0, // label-1 後
-    imageInput: 'images', sizeInput: 'orig_target_sizes',
-    outputs: { labels: 'labels', boxes: 'boxes', scores: 'scores', charCount: 'char_count' },
   },
-  recognizers: [ // charCount -> model
-    { charCount: 3, maxChars: 30,  width: 256, height: 24, file: 'parseq-ndl-24x256-30-tiny-189epoch-tegaki3-r8data-202604.onnx' },
-    { charCount: 2, maxChars: 50,  width: 384, height: 24, file: 'parseq-ndl-24x384-50-tiny-300epoch-tegaki3-r8data-202604.onnx' },
-    { charCount: 1, maxChars: 100, width: 768, height: 24, file: 'parseq-ndl-24x768-100-tiny-153epoch-tegaki3-r8data-202604.onnx' }, // フォールバック
-  ],
-  vocabSize: 7142, eosId: 0, specialTokenMax: 3, // id<4 はスキップ、charList[id-1]
-  charsetKey: 'model.charset_train', charsetFile: 'NDLmoji.yaml', // 7141 文字
+  recognizers: { // キー = 最大文字数。char_count 3->30, 2->50, その他->100
+    30:  { url: 'models/parseq-ndl-24x256-30-tiny-189epoch-tegaki3-r8data-202604.onnx',  height: 24, width: 256 },
+    50:  { url: 'models/parseq-ndl-24x384-50-tiny-300epoch-tegaki3-r8data-202604.onnx',  height: 24, width: 384 },
+    100: { url: 'models/parseq-ndl-24x768-100-tiny-153epoch-tegaki3-r8data-202604.onnx', height: 24, width: 768 },
+  },
+  charsetUrl: 'config/NDLmoji.yaml', // キー model.charset_train, 7141文字
 } as const
+export type RecognizerKey = keyof typeof OCR_CONFIG.recognizers // 30 | 50 | 100
 ```
+補足(ocrConfig 外の定数): 語彙 7142, EOS=0, スキップ id<4, 文字は charList[id-1](KNOWN LIMITATION 参照)。DEIM の入力名は `session.inputNames` から取る。
 
 ## ライセンス・配布
 - NDLOCR-Lite 本体 (ndl-lab/ndlocr-lite): README「国立国会図書館が CC BY 4.0 ライセンスで公開」、LICENCE は CC BY 4.0 全文。DEIM モデル・文字セット(NDLmoji.yaml)は NDL 帰属。
 - ndlocrlite-web (yuta1984) LICENSE: CC BY 4.0 (Copyright 2025 Yuta Hashimoto)。同 README で PARSeq 202604 版は「NDL のモデルを入力高さ24px・tegaki3 データで再学習した改良版」と明記し、NDLOCR-Lite 帰属を表示。
 - CC BY 4.0 は再配布・改変・商用利用を許諾(帰属表示・ライセンスへのリンク・改変の明示が条件)。**再配布禁止でもライセンス不明でもない -> BLOCKED ではない**。
 - 留意: 202604 版 PARSeq の R2 上の個別ライセンス表記は無く、親リポジトリの CC BY 4.0 と README の派生関係の記載に依拠する(NDL 派生物としても CC BY 4.0)。再学習に使った tegaki3 等データの権利は上流未記載。
-- 配布元URL: DEIM は上流 https://github.com/yuta1984/ndlocrlite-web/raw/main/public/models/deim-s-1024x1024.onnx (Git 通常ファイル、LFS ではない)。PARSeq 202604 は https://pub-9cac8877191a4c3697edb59fd982130f.r2.dev/<ファイル名> (個人 R2。恒久性の保証なし)。
 - 推奨: 自サイトの静的ホスティングに**同梱(自前ホスト)**し、実行時にキャッシュ(IndexedDB/Cache API)。R2 直リンクは依存しない。
 - 帰属表示文言案: 「本機能は国立国会図書館 NDLOCR-Lite (https://github.com/ndl-lab/ndlocr-lite, CC BY 4.0) のレイアウト検出・文字認識モデルおよび文字セットを利用し、ndlocrlite-web (Yuta Hashimoto, CC BY 4.0) の再学習済み文字認識モデルを、ONNX 形式のまま自サイトから配信しています。」
+
+## 上流ダウンロード元 (fetch-models.mjs 用。OCR_CONFIG の site-relative url とは別物)
+| ファイル | ダウンロード元 | SHA-256 |
+|---|---|---|
+| deim-s-1024x1024.onnx | https://raw.githubusercontent.com/yuta1984/ndlocrlite-web/50216cc/public/models/deim-s-1024x1024.onnx (通常ファイル、LFSではない) | c156ce0c4e704bc3bf7e4016d0a87b949cffa8b3724f4b4cc696b8284c3c7373 |
+| parseq-ndl-24x256-30-tiny-189epoch-tegaki3-r8data-202604.onnx | https://pub-9cac8877191a4c3697edb59fd982130f.r2.dev/ + ファイル名 | 9e651bae4c1a4d5254da1127e86e82e21ef62d5339b37e62d4a3d3d30831772d |
+| parseq-ndl-24x384-50-tiny-300epoch-tegaki3-r8data-202604.onnx | 同 R2 + ファイル名 | 49cea9db4552f19eb05c8ee202fcf74714977749b2f4c9376b127fde41b07a99 |
+| parseq-ndl-24x768-100-tiny-153epoch-tegaki3-r8data-202604.onnx | 同 R2 + ファイル名 | 06462b0dbd5b0b8508545c8c3d485cf20dbf4ffa652fe145e69c9e7457080602 |
+| NDLmoji.yaml | https://raw.githubusercontent.com/yuta1984/ndlocrlite-web/50216cc/public/config/NDLmoji.yaml | (未計測) |
+| (参考・不使用) 旧16px parseq-ndl-30.onnx | upstream@50216cc public/models | 0bc344b883cfb11f61e15bd02044dcf92997aef1f7dce84419c3aa3c3c677d54 |
+| (参考・不使用) 旧16px parseq-ndl-50.onnx | 同上 | 1a60e88c9ffeaefdfe286677146f39fdeb4d0e1acd94ccd974c8943f761d9a08 |
+| (参考・不使用) 旧16px parseq-ndl-100.onnx | 同上 | 712c7184a0a80a9048a5aefbfacd63876bacfb1c8d4d2f5c252dc39ad12bc3dd |
+
+## Residual risk
+202604 版 PARSeq 3モデルは上流作者の個人 R2 バケットにのみ存在し、ファイル単位のライセンス表記がない(親リポジトリの CC BY 4.0 と README の派生記載に依拠)。再学習に使った tegaki3 データの権利も未記載。R2 が消えても困らないよう自サイト同梱(自前ホスト)を維持し、SHA-256 で同一性を確認すること。
