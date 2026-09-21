@@ -2,6 +2,12 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+## 進捗
+
+- 完了: Task 0(公式ソース実測)・Task 1(取得元の公式固定コミット化、複数ソース対応)・Task 2(R2ミラーツール)。コミット: 3b5f5a1(ADRと実測)、f7b62b0(取得元切替)、fb38c38・53d19dc(ミラーツールと修正)。
+- 次のPRへ持ち越し: Task 3(Cloudflareアカウント/R2バケット/APIトークン/GitHub Secrets、オーナー作業)、Task 4(R2ミラーのフォールバック利用、週次の死活確認ワークフロー)。
+- Task 5(ドキュメント更新)は本PRで一部完了(出典・残作業の記載)。Task 3/4完了後に最終更新する。
+
 **Goal:** OCRモデルの入手元を「上流作者の個人R2バケット」から自分で管理できるものに置き換え、配布経路の選択(R2が最適か)を根拠付きで決め、必要ならCloudflare R2ミラーまで用意する。
 
 **Architecture:** モデルはビルド時(`npm run fetch-models`)に取得して同一オリジン(GitHub Pages)から配信する現行方式を維持し、実行時のOCRコードは変えない。変えるのは「取得元の一覧(`scripts/modelFiles.mjs`)」だけで、①NDL公式リポジトリの固定コミットを一次ソースに、②自前R2ミラーをフォールバックにする。SHA-256の固定は現行どおり必須。

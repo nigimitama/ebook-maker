@@ -89,7 +89,9 @@ export type RecognizerKey = keyof typeof OCR_CONFIG.recognizers // 30 | 50 | 100
 | (参考・不使用) 旧16px parseq-ndl-100.onnx | 同上 | 712c7184a0a80a9048a5aefbfacd63876bacfb1c8d4d2f5c252dc39ad12bc3dd |
 
 ## Residual risk
-202604 版 PARSeq 3モデルは上流作者の個人 R2 バケットにのみ存在し、ファイル単位のライセンス表記がない(親リポジトリの CC BY 4.0 と README の派生記載に依拠)。再学習に使った tegaki3 データの権利も未記載。R2 が消えても困らないよう自サイト同梱(自前ホスト)を維持し、SHA-256 で同一性を確認すること。
+**解決済み(フェーズ3)**: 以下は当時(フェーズ2)の記録。現在は NDL公式リポジトリ `ndl-lab/ndlocr-lite` の固定コミット `d25e0d4…` を取得元とし、個人バケットへの依存は解消した(SHA-256一致を確認、経緯は [ADR](2026-09-21-model-hosting-decision.md) と下の「公式ソース」)。ONNX単位のライセンス明記がない点はADRの解釈に依拠する。
+
+当時の記録: 202604 版 PARSeq 3モデルは上流作者の個人 R2 バケットにのみ存在し、ファイル単位のライセンス表記がない(親リポジトリの CC BY 4.0 と README の派生記載に依拠)。再学習に使った tegaki3 データの権利も未記載。R2 が消えても困らないよう自サイト同梱(自前ホスト)を維持し、SHA-256 で同一性を確認すること。
 
 ## 公式ソース(フェーズ3 Task 0 で実測、2026-09-21)
 固定コミット `d25e0d415b607ad44459ca6b95c7512a54363935` の `ndl-lab/ndlocr-lite`。ベースURL: `https://raw.githubusercontent.com/ndl-lab/ndlocr-lite/d25e0d415b607ad44459ca6b95c7512a54363935`。4モデルとも上表のSHA-256・サイズに**完全一致**(curlで取得しsha256sumで実測。GitHub Contents API の size とも一致)。
