@@ -10,13 +10,24 @@ export interface UseOcrResult {
   running: boolean
   error: string | null
   clearError: () => void
-  runOne: (pageId: string) => Promise<void>
-  runAll: (pageIds: string[], opts?: { skipDone?: boolean }) => Promise<void>
+  runOne: (pageId: string, opts?: RunOptions) => Promise<RunSummary>
+  runAll: (pageIds: string[], opts?: RunOptions) => Promise<RunSummary>
   cancel: () => void
   updateLine: (pageId: string, lineId: string, text: string) => Promise<void>
   deleteLine: (pageId: string, lineId: string) => Promise<void>
   addLine: (pageId: string, box: Box, afterLineId?: string) => Promise<void>
   moveLine: (pageId: string, lineId: string, toIndex: number) => Promise<void>
+}
+
+export interface RunOptions {
+  skipDone?: boolean
+  /** true で、ユーザーが編集した行を含むページも上書きして再実行する。 */
+  overwriteEdited?: boolean
+}
+
+export interface RunSummary {
+  /** 編集済みの行があるため実行を見送ったページID(「上書きして再実行」の確認用)。 */
+  skippedEdited: string[]
 }
 
 export interface UseOcrOptions {
@@ -51,6 +62,9 @@ export function useOcr(
   const runnerRef = useRef<OcrRunner | null>(null)
   const cancelRef = useRef(false)
   const runningRef = useRef(false)
+  const mountedRef = useRef(true)
+  const reloadPendingRef = useRef(false)
+  const editChainsRef = useRef<Map<string, Promise<unknown>>>(new Map())
   const resultsRef = useRef<Record<string, OcrResult>>({})
   const [results, setResultsState] = useState<Record<string, OcrResult>>({})
   const [progress, setProgress] = useState<UseOcrResult['progress']>(null)
@@ -64,32 +78,39 @@ export function useOcr(
 
   const clearError = useCallback(() => setError(null), [])
 
-  // ページ一覧が変わったら保存済み結果を読み直す(ページIDの並びをキーにする)。
-  const pagesKey = pageIds ? pageIds.join('\n') : null
-  useEffect(() => {
-    let cancelled = false
-    void (async () => {
-      const store = await getStoreRef.current()
-      if (!store || cancelled) return
-      const list = await store.listOcr()
-      if (cancelled) return
-      const next: Record<string, OcrResult> = {}
-      for (const r of list) next[r.pageId] = r
-      setResults(next)
-    })().catch(() => {})
-    return () => {
-      cancelled = true
+  const reload = useCallback(async () => {
+    // 実行中に読み直すと、書き込み途中の結果を落としかねない。終了時にまとめて読み直す。
+    if (runningRef.current) {
+      reloadPendingRef.current = true
+      return
     }
-  }, [pagesKey, setResults])
+    const store = await getStoreRef.current()
+    if (!store || !mountedRef.current || runningRef.current) return
+    const list = await store.listOcr()
+    if (!mountedRef.current || runningRef.current) return
+    const next: Record<string, OcrResult> = {}
+    for (const r of list) next[r.pageId] = r
+    setResults(next)
+  }, [setResults])
 
-  useEffect(
-    () => () => {
+  // ページ一覧が変わったら保存済み結果を読み直す(ページIDの並びをキーにする)。
+  const pagesKey = pageIds ? pageIds.join(',') : null
+  useEffect(() => {
+    void reload().catch(() => {})
+  }, [pagesKey, reload])
+
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+      cancelRef.current = true
       runnerRef.current?.dispose()
       runnerRef.current = null
-    },
-    [],
-  )
+    }
+  }, [])
 
+  // 実行中のページの認識は止められない。そのページは最後まで処理して保存し、
+  // 残りのページだけを飛ばす。
   const cancel = useCallback(() => {
     cancelRef.current = true
   }, [])
@@ -100,30 +121,50 @@ export function useOcr(
   }, [])
 
   const runAll = useCallback(
-    async (ids: string[], opts?: { skipDone?: boolean }) => {
-      if (runningRef.current) return
-      const store = await getStoreRef.current()
-      if (!store) return
+    async (ids: string[], opts?: RunOptions): Promise<RunSummary> => {
+      const summary: RunSummary = { skippedEdited: [] }
+      // 最初のawaitより前に確保する。さもないと同時に2回呼ばれたとき両方が走る。
+      if (runningRef.current) return summary
       runningRef.current = true
       cancelRef.current = false
       setRunning(true)
       const failed: string[] = []
       try {
+        const store = await getStoreRef.current()
+        if (!store) return summary
         const pages = await store.listPages()
+        const hasEdits = (id: string) => resultsRef.current[id]?.lines.some((l) => l.edited)
         const targets = ids
           .map((id) => pages.find((p) => p.id === id))
           .filter((p): p is NonNullable<typeof p> => p !== undefined)
           .filter((p) => !(opts?.skipDone && resultsRef.current[p.id]))
+          .filter((p) => {
+            if (!opts?.overwriteEdited && hasEdits(p.id)) {
+              summary.skippedEdited.push(p.id)
+              return false
+            }
+            return true
+          })
         setProgress({ done: 0, total: targets.length })
         for (const [index, page] of targets.entries()) {
-          if (cancelRef.current) break
+          if (cancelRef.current || !mountedRef.current) break
           try {
             const blob = await store.getBlob(page.blobId)
             if (!blob) throw new Error(`image data not found for page: ${page.id}`)
+            if (!mountedRef.current) break
             runnerRef.current ??= createRunnerRef.current()
-            const lines = await runnerRef.current.recognizePage(blob, (stage) =>
-              setProgress({ done: index, total: targets.length, stage }),
-            )
+            const lines = await runnerRef.current.recognizePage(blob, (stage) => {
+              if (mountedRef.current) setProgress({ done: index, total: targets.length, stage })
+            })
+            if (!mountedRef.current) break
+            // 認識中にページが削除された場合は、孤立したOCR結果を残さない。
+            if (!(await store.listPages()).some((p) => p.id === page.id)) continue
+            // 認識中にユーザーが編集していた場合は、その編集を守って新しい結果を捨てる。
+            const latest = await store.getOcr(page.id)
+            if (!opts?.overwriteEdited && latest?.lines.some((l) => l.edited)) {
+              setResults({ ...resultsRef.current, [page.id]: latest })
+              continue
+            }
             const result: OcrResult = {
               pageId: page.id,
               lines,
@@ -131,34 +172,55 @@ export function useOcr(
               updatedAt: Date.now(),
             }
             await store.putOcr(result)
-            setResults({ ...resultsRef.current, [page.id]: result })
+            if (mountedRef.current) setResults({ ...resultsRef.current, [page.id]: result })
           } catch {
             failed.push(page.fileName ?? page.id)
             // Workerが壊れている可能性があるので捨てる。次のページで作り直される。
             discardRunner()
           }
-          setProgress({ done: index + 1, total: targets.length })
+          if (mountedRef.current) setProgress({ done: index + 1, total: targets.length })
         }
       } finally {
         runningRef.current = false
-        setRunning(false)
-        setProgress(null)
+        if (mountedRef.current) {
+          setRunning(false)
+          setProgress(null)
+        }
       }
-      setError(failed.length > 0 ? `文字認識に失敗しました: ${failed.join(', ')}` : null)
+      if (mountedRef.current) {
+        setError(failed.length > 0 ? `文字認識に失敗しました: ${failed.join(', ')}` : null)
+        if (reloadPendingRef.current) {
+          reloadPendingRef.current = false
+          void reload().catch(() => {})
+        }
+      }
+      return summary
     },
-    [setResults, discardRunner],
+    [setResults, discardRunner, reload],
   )
 
-  const runOne = useCallback((pageId: string) => runAll([pageId]), [runAll])
+  const runOne = useCallback(
+    (pageId: string, opts?: RunOptions) => runAll([pageId], opts),
+    [runAll],
+  )
 
+  // 同じページへの編集は直列化する(読み→書きが交差して編集が失われないように)。
   const mutate = useCallback(
-    async (pageId: string, edit: (lines: OcrLine[]) => OcrLine[]) => {
-      const store = await getStoreRef.current()
-      const current = resultsRef.current[pageId]
-      if (!store || !current) return
-      const result: OcrResult = { ...current, lines: edit(current.lines), updatedAt: Date.now() }
-      await store.putOcr(result)
-      setResults({ ...resultsRef.current, [pageId]: result })
+    (pageId: string, edit: (lines: OcrLine[]) => OcrLine[]): Promise<void> => {
+      const chains = editChainsRef.current
+      const task = (chains.get(pageId) ?? Promise.resolve()).then(async () => {
+        const store = await getStoreRef.current()
+        const current = resultsRef.current[pageId]
+        if (!store || !current) return
+        const result: OcrResult = { ...current, lines: edit(current.lines), updatedAt: Date.now() }
+        await store.putOcr(result)
+        setResults({ ...resultsRef.current, [pageId]: result })
+      })
+      chains.set(
+        pageId,
+        task.catch(() => undefined),
+      )
+      return task
     },
     [setResults],
   )

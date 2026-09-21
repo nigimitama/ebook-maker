@@ -20,7 +20,7 @@ describe('useOcr', () => {
   let pages: PageEntry[]
   let calls: number[]
   let failOn: Set<number>
-  let onCall: (() => void) | undefined
+  let onCall: (() => void | Promise<void>) | undefined
   let runner: OcrRunner
   let createRunner: ReturnType<typeof vi.fn<() => OcrRunner>>
 
@@ -45,7 +45,7 @@ describe('useOcr', () => {
         calls.push(byte)
         onStage?.('layout' as never)
         await new Promise((r) => setTimeout(r, 5))
-        onCall?.()
+        await onCall?.()
         if (failOn.has(byte)) throw new Error('boom')
         return [line(`l${byte}a`, `t${byte}a`), line(`l${byte}b`, `t${byte}b`)]
       }),
@@ -172,5 +172,94 @@ describe('useOcr', () => {
     expect(createRunner).toHaveBeenCalledTimes(2)
     unmount()
     expect(runner.dispose).toHaveBeenCalled()
+  })
+  it('unmount during a run creates no further runner and disposes the runner', async () => {
+    const { result, unmount } = setup()
+    onCall = () => unmount()
+    await act(async () => {
+      await result.current.runAll(pages.map((p) => p.id))
+    })
+    expect(calls).toEqual([1])
+    expect(createRunner).toHaveBeenCalledTimes(1)
+    expect(runner.dispose).toHaveBeenCalled()
+  })
+
+  it('a double start runs only once', async () => {
+    const { result } = setup()
+    await act(async () => {
+      await Promise.all([
+        result.current.runAll(pages.map((p) => p.id)),
+        result.current.runAll(pages.map((p) => p.id)),
+      ])
+    })
+    expect(calls).toEqual([1, 2, 3])
+  })
+
+  it('re-run skips pages with edited lines unless overwriteEdited is set', async () => {
+    const { result } = setup()
+    const id = pages[0].id
+    await act(async () => {
+      await result.current.runOne(id)
+      await result.current.updateLine(id, 'l1a', 'mine')
+    })
+    calls.length = 0
+    let summary: { skippedEdited: string[] } | undefined
+    await act(async () => {
+      summary = await result.current.runAll(pages.map((p) => p.id))
+    })
+    expect(summary?.skippedEdited).toEqual([id])
+    expect(calls).toEqual([2, 3])
+    expect(result.current.results[id].lines[0].text).toBe('mine')
+    await act(async () => {
+      summary = await result.current.runOne(id, { overwriteEdited: true })
+    })
+    expect(summary?.skippedEdited).toEqual([])
+    expect(result.current.results[id].lines[0]).toMatchObject({ text: 't1a', edited: false })
+  })
+
+  it('an edit made while the page is recognizing is not overwritten', async () => {
+    const { result } = setup()
+    const id = pages[0].id
+    await act(async () => {
+      await result.current.runOne(id)
+    })
+    onCall = async () => {
+      onCall = undefined
+      await result.current.updateLine(id, 'l1a', 'during')
+    }
+    await act(async () => {
+      await result.current.runOne(id)
+    })
+    expect((await store.getOcr(id))?.lines[0]).toMatchObject({ text: 'during', edited: true })
+    expect(result.current.results[id].lines[0].text).toBe('during')
+  })
+
+  it('does not leave OCR behind for a page deleted mid-run', async () => {
+    const { result } = setup()
+    onCall = async () => {
+      if (calls[calls.length - 1] === 2) await store.deletePage(pages[1].id)
+    }
+    await act(async () => {
+      await result.current.runAll(pages.map((p) => p.id))
+    })
+    expect((await store.listOcr()).map((o) => o.pageId).sort()).toEqual(
+      [pages[0].id, pages[2].id].sort(),
+    )
+    expect(result.current.error).toBeNull()
+  })
+
+  it('serializes concurrent edits on one page without losing any', async () => {
+    const { result } = setup()
+    const id = pages[0].id
+    await act(async () => {
+      await result.current.runOne(id)
+    })
+    await act(async () => {
+      await Promise.all([
+        result.current.updateLine(id, 'l1a', 'A'),
+        result.current.updateLine(id, 'l1b', 'B'),
+      ])
+    })
+    expect(result.current.results[id].lines.map((l) => l.text)).toEqual(['A', 'B'])
   })
 })
