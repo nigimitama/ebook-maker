@@ -1,4 +1,4 @@
-import { basename, dirname, join } from 'node:path'
+import { basename, win32 } from 'node:path'
 
 export const WRANGLER_PACKAGE = 'wrangler@4'
 const BUCKET_RE = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/
@@ -18,7 +18,8 @@ export function validateBucket(bucket) {
 export function wranglerCommand(wranglerArgs, platform = process.platform, execPath = process.execPath) {
   const args = ['--yes', WRANGLER_PACKAGE, ...wranglerArgs]
   if (platform === 'win32') {
-    return { command: execPath, args: [join(dirname(execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js'), ...args] }
+    // execPath は Windows 形式なので、ホストOSに依らず win32 のパス規則で扱う
+    return { command: execPath, args: [win32.join(win32.dirname(execPath), 'node_modules', 'npm', 'bin', 'npx-cli.js'), ...args] }
   }
   return { command: 'npx', args }
 }

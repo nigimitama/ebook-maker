@@ -28,7 +28,7 @@ describe('buildMirrorPlan', () => {
   it('sha256 が null のエントリはスキップする', () => {
     expect(buildMirrorPlan([f, { ...f, dest: 'public/config/b.yaml', sha256: null }], 'bkt')).toHaveLength(1)
   })
-  it('ハッシュ記録済みの MODEL_FILES につき、ちょうど1件の計画になる', () => {
+  it('ハッシュ記録済みの MODEL_FILES の数だけ計画が作られ、キーは一意', () => {
     const files = MODEL_FILES as { sha256: string | null }[]
     const plan = buildMirrorPlan(files, 'bkt')
     expect(plan).toHaveLength(files.filter((x) => x.sha256).length)
@@ -67,9 +67,9 @@ describe('引数の構造', () => {
 
 describe('wranglerCommand', () => {
   it('win32 はシェルなしで node + npx-cli.js、メジャー固定', () => {
-    const c = wranglerCommand(['r2'], 'win32', 'C:\node\node.exe')
-    expect(c.command).toBe('C:\node\node.exe')
-    expect(c.args[0]).toMatch(/npx-cli\.js$/)
+    const c = wranglerCommand(['r2'], 'win32', 'C:\\node\\node.exe')
+    expect(c.command).toBe('C:\\node\\node.exe')
+    expect(c.args[0]).toBe('C:\\node\\node_modules\\npm\\bin\\npx-cli.js')
     expect(c.args.slice(1)).toEqual(['--yes', 'wrangler@4', 'r2'])
   })
   it('その他は npx wrangler@4', () => {

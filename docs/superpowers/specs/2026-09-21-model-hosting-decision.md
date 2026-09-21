@@ -1,6 +1,6 @@
 # ADR: OCRモデルの配布元(2026-09-21)
 
-Status: 承認待ち(ライセンス解釈に留意事項あり。下記「ライセンス」)
+Status: 採用(実装済み。ライセンスは解釈であり、ONNXを名指しする文はない旨を残存リスクとして維持。下記「ライセンス」)
 関連: `2026-09-21-ocr-phase2-model-notes.md`、`docs/superpowers/plans/2026-09-21-phase3-model-hosting.md`
 
 ## 背景

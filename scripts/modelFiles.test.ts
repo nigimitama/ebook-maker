@@ -28,6 +28,12 @@ describe('MODEL_FILES', () => {
       for (const url of f.sources) expect(url, f.dest).toMatch(/^https:\/\//)
     }
   })
+  it('全エントリが64桁hexの sha256 と1つ以上の sources を持つ', () => {
+    for (const f of entries) {
+      expect(f.sha256, f.dest).toMatch(/^[0-9a-f]{64}$/)
+      expect(f.sources.length, f.dest).toBeGreaterThanOrEqual(1)
+    }
+  })
   it('モデル(.onnx)4本は64桁hexの sha256 を持つ', () => {
     const models = entries.filter((f) => f.dest.endsWith('.onnx'))
     expect(models).toHaveLength(4)

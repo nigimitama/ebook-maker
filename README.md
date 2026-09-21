@@ -34,7 +34,7 @@ npm run lint       # oxlint
 
 ## OCRモデルの出典・ライセンス・帰属表示
 
-本機能は国立国会図書館 NDLOCR-Lite (https://github.com/ndl-lab/ndlocr-lite, CC BY 4.0) のレイアウト検出・文字認識モデルおよび文字セットを利用し、ndlocrlite-web (Yuta Hashimoto, CC BY 4.0, https://github.com/yuta1984/ndlocrlite-web) の再学習済み文字認識モデルを、ONNX 形式のまま自サイトから配信しています。
+本機能は国立国会図書館 NDLOCR-Lite (https://github.com/ndl-lab/ndlocr-lite, CC BY 4.0) のレイアウト検出・文字認識モデル(202604 の PARSeq は公式リポジトリの ver1.2)および文字セット `NDLmoji.yaml` を、固定コミット `d25e0d415b607ad44459ca6b95c7512a54363935` から取得し、ONNX 形式のまま自サイトから配信しています。文字セットは公式版に切り替えました(プレースホルダだった箇所が希少CJK文字4字になります)。ブラウザ側のパイプラインは ndlocrlite-web (Yuta Hashimoto, CC BY 4.0, https://github.com/yuta1984/ndlocrlite-web) をWeb実装の参考にしており(本アプリのコードは独自実装)、DEIMv2 の第2取得元としても同リポジトリを使います。
 
 モデルはNDL公式リポジトリ `ndl-lab/ndlocr-lite` の固定コミット `d25e0d415b607ad44459ca6b95c7512a54363935` から取得します(以前使っていたファイルとバイト単位で同一で、SHA-256で検証済み)。文字セットも公式の `NDLmoji.yaml` を採用しています。個人バケットへの依存はありません。
 
