@@ -355,7 +355,15 @@ export function OcrReview({
       </div>
 
       <p className="ocr-review__attribution">
-        OCRモデル: 国立国会図書館 NDLOCR-Lite (CC BY 4.0) を元にした ndlocrlite-web のモデルを使用
+        OCRモデル: 国立国会図書館 NDLOCR-Lite (
+        <a
+          href="https://creativecommons.org/licenses/by/4.0/deed.ja"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          CC BY 4.0
+        </a>
+        ) を元にした ndlocrlite-web のモデルを使用
       </p>
     </div>
   )

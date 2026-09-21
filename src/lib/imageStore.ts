@@ -9,6 +9,7 @@ const OCR_STORE = 'ocr'
 function openDb(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(name, 2)
+    let settled = false
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(BLOB_STORE)) {
@@ -21,9 +22,35 @@ function openDb(name: string): Promise<IDBDatabase> {
         db.createObjectStore(OCR_STORE, { keyPath: 'pageId' })
       }
     }
-    req.onsuccess = () => resolve(req.result)
-    req.onerror = () => reject(req.error)
+    req.onblocked = () => {
+      // 他のタブが古い接続を保持している。待っても解決しない可能性があるので通知する。
+      settled = true
+      reject(new OpenBlockedError())
+    }
+    req.onsuccess = () => {
+      const db = req.result
+      if (settled) {
+        // ブロック通知後に遅れて成功した接続はリークさせない。
+        db.close()
+        return
+      }
+      settled = true
+      db.onversionchange = () => db.close()
+      resolve(db)
+    }
+    req.onerror = () => {
+      if (settled) return
+      settled = true
+      reject(req.error)
+    }
   })
+}
+
+export class OpenBlockedError extends Error {
+  constructor() {
+    super('他のタブでこのアプリを開いています。他のタブを閉じてから再読み込みしてください')
+    this.name = 'OpenBlockedError'
+  }
 }
 
 function reqToPromise<T>(req: IDBRequest<T>): Promise<T> {

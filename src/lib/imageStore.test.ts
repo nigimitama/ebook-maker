@@ -188,3 +188,42 @@ describe('ImageStore', () => {
     })
   })
 })
+
+describe('ImageStore open blocking', () => {
+  it('他の接続が古いバージョンを保持していると、ハングせず案内付きで reject する', async () => {
+    const name = `blocked-db-${Math.random()}`
+    const v1 = await new Promise<IDBDatabase>((resolve, reject) => {
+      const r = indexedDB.open(name, 1)
+      r.onsuccess = () => resolve(r.result)
+      r.onerror = () => reject(r.error)
+    })
+    const result = await Promise.race([
+      ImageStore.open(name).then(
+        () => 'resolved',
+        (e: Error) => e.message,
+      ),
+      new Promise<string>((r) => setTimeout(() => r('timeout'), 1000)),
+    ])
+    expect(result).toContain('他のタブ')
+    v1.close()
+  })
+
+  it('より新しいバージョンが開かれるとversionchangeで自分から閉じる', async () => {
+    const name = `vc-db-${Math.random()}`
+    const store = await ImageStore.open(name)
+    const ok = await Promise.race([
+      new Promise<boolean>((resolve, reject) => {
+        const r = indexedDB.open(name, 3)
+        r.onsuccess = () => {
+          r.result.close()
+          resolve(true)
+        }
+        r.onerror = () => reject(r.error)
+        r.onblocked = () => resolve(false)
+      }),
+      new Promise<boolean>((r) => setTimeout(() => r(false), 1000)),
+    ])
+    expect(ok).toBe(true)
+    void store
+  })
+})

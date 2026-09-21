@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ImageStore } from '../lib/imageStore'
+import { ImageStore, OpenBlockedError } from '../lib/imageStore'
 import { decodeBlobToRawImage } from '../lib/decodeImage'
 import { downscale, hideFromDevtools } from '../lib/downscaleImage'
 import { PREVIEW_MAX_EDGE, THUMBNAIL_MAX_EDGE } from '../lib/previewSizes'
@@ -145,9 +145,13 @@ export function useBook(): UseBookResult {
         setThumbnails((current) => ({ ...restored, ...current }))
         setPages(loaded)
       })
-      .catch(() => {
+      .catch((e: unknown) => {
         if (!cancelled) {
-          setError('このブラウザは対応していません(IndexedDBが利用できません)')
+          setError(
+            e instanceof OpenBlockedError
+              ? e.message
+              : 'このブラウザは対応していません(IndexedDBが利用できません)',
+          )
         }
       })
     return () => {

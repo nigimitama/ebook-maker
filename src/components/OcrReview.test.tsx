@@ -187,7 +187,11 @@ describe('OcrReview', () => {
 
   it('出典表記がある', () => {
     setup(makeOcr())
-    expect(screen.getByText(/NDLOCR-Lite \(CC BY 4\.0\)/)).toBeInTheDocument()
+    expect(screen.getByText(/NDLOCR-Lite/)).toHaveTextContent(/NDLOCR-Lite \(\s*CC BY 4\.0\s*\)/)
+    const link = screen.getByRole('link', { name: /CC BY 4\.0/ })
+    expect(link).toHaveAttribute('href', 'https://creativecommons.org/licenses/by/4.0/deed.ja')
+    expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+    expect(link).toHaveAttribute('target', '_blank')
   })
 
   it('枠追加モード: ドラッグで原本px の枠を addLine する(小さいドラッグは無視)', async () => {
