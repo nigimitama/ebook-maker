@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { UseOcrResult } from '../hooks/useOcr'
 import type { OcrLine, OcrResult } from '../lib/ocr/types'
 import type { PageEntry, RawImage } from '../types'
-import { buildPlainText } from '../lib/ocrText'
+import { buildPlainText, hasOcrText, ocrFileName } from '../lib/ocrText'
 import { OcrOverlay } from './OcrOverlay'
 import { ProgressBar } from './ProgressBar'
 
@@ -16,10 +16,6 @@ export interface OcrReviewProps {
   ocr: UseOcrResult
   /** 書き出すテキストファイル名に使う書名。 */
   title?: string
-}
-
-function sanitizeFileName(name: string): string {
-  return name.trim().replace(/[\/:*?"<>|]/g, '_')
 }
 
 function statusOf(result: OcrResult | undefined): '未' | '済' | '修正あり' {
@@ -161,8 +157,7 @@ export function OcrReview({
     const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }))
     const a = document.createElement('a')
     a.href = url
-    const base = title ? sanitizeFileName(title) : ''
-    a.download = `${base || 'ocr'}.txt`
+    a.download = ocrFileName(title)
     document.body.appendChild(a)
     a.click()
     a.remove()
@@ -235,7 +230,7 @@ export function OcrReview({
         <button
           type="button"
           className="btn btn-ghost"
-          disabled={!pages.some((p) => ocr.results[p.id])}
+          disabled={!hasOcrText(pages, ocr.results)}
           onClick={saveText}
         >
           テキストを保存(.txt)

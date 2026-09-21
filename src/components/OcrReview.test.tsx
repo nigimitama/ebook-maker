@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { OcrReview } from './OcrReview'
 import type { UseOcrResult } from '../hooks/useOcr'
@@ -340,28 +340,49 @@ describe('OcrReview', () => {
     expect(await screen.findByRole('button', { name: '修正済みの行があります。上書きして再実行' })).toBeInTheDocument()
   })
 
-  it('「テキストを保存(.txt)」は結果が無ければ無効、あればBlobをダウンロードする', async () => {
-    setup(makeOcr())
-    expect(screen.getByRole('button', { name: 'テキストを保存(.txt)' })).toBeDisabled()
-  })
-
-  it('結果があると .txt をタイトル名でダウンロードし、URLを解放する', async () => {
-    const create = vi.fn().mockReturnValue('blob:txt')
-    const revoke = vi.fn()
-    Object.assign(URL, { createObjectURL: create, revokeObjectURL: revoke })
-    const clicked: string[] = []
-    const spy = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
-      clicked.push(this.download)
+  describe('テキスト保存', () => {
+    const origCreate = URL.createObjectURL
+    const origRevoke = URL.revokeObjectURL
+    afterEach(() => {
+      URL.createObjectURL = origCreate
+      URL.revokeObjectURL = origRevoke
+      vi.restoreAllMocks()
     })
-    setup(makeOcr({ results: { a: resultA } }))
-    const btn = screen.getByRole('button', { name: 'テキストを保存(.txt)' })
-    expect(btn).toBeEnabled()
-    fireEvent.click(btn)
-    expect(create).toHaveBeenCalledTimes(1)
-    const blob = create.mock.calls[0][0] as Blob
-    expect(await blob.text()).toBe('一行目\n二行目\n三行目')
-    expect(clicked).toEqual(['我輩は猫.txt'])
-    expect(revoke).toHaveBeenCalledWith('blob:txt')
-    spy.mockRestore()
+
+    it('結果が無い、または全行が空なら無効', () => {
+      setup(makeOcr())
+      expect(screen.getByRole('button', { name: 'テキストを保存(.txt)' })).toBeDisabled()
+    })
+
+    it('全行が空の結果だけでも無効', () => {
+      const empty: OcrResult = {
+        ...resultA,
+        lines: resultA.lines.map((l) => ({ ...l, text: '' })),
+      }
+      setup(makeOcr({ results: { a: empty } }))
+      expect(screen.getByRole('button', { name: 'テキストを保存(.txt)' })).toBeDisabled()
+    })
+
+    it('クリックでtext/plainのBlobを作り、タイトル名でダウンロードしてURLを解放する', async () => {
+      const create = vi.fn().mockReturnValue('blob:txt')
+      const revoke = vi.fn()
+      URL.createObjectURL = create
+      URL.revokeObjectURL = revoke
+      const clicked: string[] = []
+      vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
+        clicked.push(this.download)
+      })
+      setup(makeOcr({ results: { a: resultA } }))
+      const btn = screen.getByRole('button', { name: 'テキストを保存(.txt)' })
+      expect(btn).toBeEnabled()
+      fireEvent.click(btn)
+      expect(create).toHaveBeenCalledTimes(1)
+      const blob = create.mock.calls[0][0] as Blob
+      expect(blob).toBeInstanceOf(Blob)
+      expect(blob.type).toBe('text/plain;charset=utf-8')
+      expect(await blob.text()).toBe('一行目\n二行目\n三行目')
+      expect(clicked).toEqual(['我輩は猫.txt'])
+      expect(revoke).toHaveBeenCalledWith('blob:txt')
+    })
   })
 })
