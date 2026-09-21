@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { ImageStore } from './imageStore'
 import { Blob as NodeBlob } from 'node:buffer'
+import type { OcrResult } from './ocr/types'
 
 function blob(byte: number): Blob {
   return new NodeBlob([new Uint8Array([byte])], { type: 'image/png' }) as unknown as Blob
@@ -101,5 +102,89 @@ describe('ImageStore', () => {
     expect(await store.getBlob(p2.thumbBlobId!)).toBeUndefined()
     const thumb = await store.getBlob(merged.thumbBlobId!)
     expect(Array.from(new Uint8Array(await thumb!.arrayBuffer()))).toEqual([13])
+  })
+  describe('OCR results', () => {
+    function ocr(pageId: string, text = 'a'): OcrResult {
+      return {
+        pageId,
+        lines: [{ id: `${pageId}-l`, x: 1, y: 2, w: 3, h: 4, text, edited: false }],
+        modelVersion: 't',
+        updatedAt: 1,
+      }
+    }
+
+    it('round-trips put/get/list/delete', async () => {
+      const p1 = await store.addPage(blob(1), 5, 5)
+      const p2 = await store.addPage(blob(2), 5, 5)
+      await store.putOcr(ocr(p1.id))
+      await store.putOcr(ocr(p2.id))
+      expect(await store.getOcr(p1.id)).toEqual(ocr(p1.id))
+      expect((await store.listOcr()).length).toBe(2)
+      await store.deleteOcr(p1.id)
+      expect(await store.getOcr(p1.id)).toBeUndefined()
+    })
+
+    it('deletePage removes its OCR', async () => {
+      const p1 = await store.addPage(blob(1), 5, 5)
+      await store.putOcr(ocr(p1.id))
+      await store.deletePage(p1.id)
+      expect(await store.listOcr()).toEqual([])
+    })
+
+    it('clearAll removes all OCR and restorePages brings it back', async () => {
+      const p1 = await store.addPage(blob(1), 5, 5)
+      const o = ocr(p1.id)
+      await store.putOcr(o)
+      const pages = await store.listPages()
+      await store.clearAll()
+      expect(await store.listOcr()).toEqual([])
+      await store.restorePages(pages, [], [o])
+      expect(await store.listOcr()).toEqual([o])
+    })
+
+    it('merge removes source OCR and the merged page has none', async () => {
+      const p1 = await store.addPage(blob(1), 5, 5)
+      const p2 = await store.addPage(blob(2), 5, 5)
+      const p3 = await store.addPage(blob(3), 5, 5)
+      for (const p of [p1, p2, p3]) await store.putOcr(ocr(p.id))
+      const merged = await store.replacePagesWithMerged([p1.id, p2.id], blob(9), 10, 5)
+      expect((await store.listOcr()).map((o) => o.pageId)).toEqual([p3.id])
+      expect(await store.getOcr(merged.id)).toBeUndefined()
+    })
+
+    it('opens a v1 database under v2 and keeps pages readable', async () => {
+      const name = `v1-db-${Math.random()}`
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        const req = indexedDB.open(name, 1)
+        req.onupgradeneeded = () => {
+          req.result.createObjectStore('blobs')
+          req.result.createObjectStore('pages', { keyPath: 'id' })
+        }
+        req.onsuccess = () => resolve(req.result)
+        req.onerror = () => reject(req.error)
+      })
+      const page = {
+        id: 'old',
+        order: 0,
+        blobId: 'b',
+        width: 1,
+        height: 1,
+        adjustment: { brightness: 0, contrast: 0 },
+      }
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction(['pages', 'blobs'], 'readwrite')
+        tx.objectStore('pages').put(page)
+        tx.objectStore('blobs').put(blob(7), 'b')
+        tx.oncomplete = () => resolve()
+        tx.onerror = () => reject(tx.error)
+      })
+      db.close()
+      const v2 = await ImageStore.open(name)
+      expect((await v2.listPages()).map((p) => p.id)).toEqual(['old'])
+      expect(await v2.listOcr()).toEqual([])
+      await v2.putOcr(ocr('old'))
+      expect(await v2.getOcr('old')).toBeDefined()
+      v2.close()
+    })
   })
 })

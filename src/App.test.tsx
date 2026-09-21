@@ -7,6 +7,7 @@ import type { UseBookResult } from './hooks/useBook'
 function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
   return {
     pages: [],
+    getStore: vi.fn(async () => null),
     thumbnails: {},
     metadata: { title: '', author: '' },
     selectedPageId: null,

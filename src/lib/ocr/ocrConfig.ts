@@ -21,3 +21,6 @@ export const OCR_CONFIG = {
 } as const
 
 export type RecognizerKey = keyof typeof OCR_CONFIG.recognizers // 30 | 50 | 100
+
+// 保存するOCR結果に付けるモデル識別子(認識モデルのファイル名末尾と揃える)
+export const OCR_MODEL_VERSION = '202604'

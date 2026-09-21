@@ -9,10 +9,13 @@ import { applyAdjustment } from '../lib/applyAdjustment'
 import { mergeSpread } from '../lib/mergeSpread'
 import { runExportInWorker } from '../lib/exportRunner'
 import type { ExportRequestPage } from '../workers/exportCore'
+import type { OcrResult } from '../lib/ocr/types'
 import type { AdjustmentParams, BookMetadata, PageEntry, RawImage } from '../types'
 
 export interface UseBookResult {
   pages: PageEntry[]
+  /** OCR結果などをページ操作と同じDBで扱うためにストアを渡す口(useOcr用)。 */
+  getStore: () => Promise<ImageStore | null>
   thumbnails: Record<string, string>
   metadata: BookMetadata
   selectedPageId: string | null
@@ -80,7 +83,11 @@ export function useBook(): UseBookResult {
   const [importProgress, setImportProgress] = useState<{ done: number; total: number } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [canUndoClearAll, setCanUndoClearAll] = useState(false)
-  const clearAllSnapshotRef = useRef<{ pages: PageEntry[]; blobs: [string, Blob][] } | null>(null)
+  const clearAllSnapshotRef = useRef<{
+    pages: PageEntry[]
+    blobs: [string, Blob][]
+    ocr: OcrResult[]
+  } | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -509,8 +516,9 @@ export function useBook(): UseBookResult {
       const blob = await store.getBlob(blobId)
       if (blob) snapshotBlobs.push([blobId, blob])
     }
+    const snapshotOcr = await store.listOcr()
     await store.clearAll()
-    clearAllSnapshotRef.current = { pages: snapshotPages, blobs: snapshotBlobs }
+    clearAllSnapshotRef.current = { pages: snapshotPages, blobs: snapshotBlobs, ocr: snapshotOcr }
     setCanUndoClearAll(snapshotPages.length > 0)
     setThumbnails((current) => {
       for (const url of Object.values(current)) URL.revokeObjectURL(url)
@@ -525,7 +533,7 @@ export function useBook(): UseBookResult {
     const store = storeRef.current
     const snapshot = clearAllSnapshotRef.current
     if (!store || !snapshot) return
-    await store.restorePages(snapshot.pages, snapshot.blobs)
+    await store.restorePages(snapshot.pages, snapshot.blobs, snapshot.ocr)
     clearAllSnapshotRef.current = null
     setCanUndoClearAll(false)
     const restoredThumbnails: Record<string, string> = {}
@@ -619,6 +627,7 @@ export function useBook(): UseBookResult {
 
   return {
     pages,
+    getStore,
     thumbnails,
     metadata,
     selectedPageId,

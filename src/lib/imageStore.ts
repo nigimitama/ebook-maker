@@ -1,12 +1,14 @@
 import type { AdjustmentParams, PageEntry } from '../types'
 import { DEFAULT_ADJUSTMENT } from '../types'
+import type { OcrResult } from './ocr/types'
 
 const BLOB_STORE = 'blobs'
 const PAGE_STORE = 'pages'
+const OCR_STORE = 'ocr'
 
 function openDb(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(name, 1)
+    const req = indexedDB.open(name, 2)
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(BLOB_STORE)) {
@@ -14,6 +16,9 @@ function openDb(name: string): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(PAGE_STORE)) {
         db.createObjectStore(PAGE_STORE, { keyPath: 'id' })
+      }
+      if (!db.objectStoreNames.contains(OCR_STORE)) {
+        db.createObjectStore(OCR_STORE, { keyPath: 'pageId' })
       }
     }
     req.onsuccess = () => resolve(req.result)
@@ -130,12 +135,35 @@ export class ImageStore {
     await txDone(tx)
   }
 
+  async getOcr(pageId: string): Promise<OcrResult | undefined> {
+    const tx = this.db.transaction(OCR_STORE, 'readonly')
+    return reqToPromise(tx.objectStore(OCR_STORE).get(pageId)) as Promise<OcrResult | undefined>
+  }
+
+  async listOcr(): Promise<OcrResult[]> {
+    const tx = this.db.transaction(OCR_STORE, 'readonly')
+    return (await reqToPromise(tx.objectStore(OCR_STORE).getAll())) as OcrResult[]
+  }
+
+  async putOcr(result: OcrResult): Promise<void> {
+    const tx = this.db.transaction(OCR_STORE, 'readwrite')
+    tx.objectStore(OCR_STORE).put(result)
+    await txDone(tx)
+  }
+
+  async deleteOcr(pageId: string): Promise<void> {
+    const tx = this.db.transaction(OCR_STORE, 'readwrite')
+    tx.objectStore(OCR_STORE).delete(pageId)
+    await txDone(tx)
+  }
+
   async deletePage(id: string): Promise<void> {
-    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
     const pageStore = tx.objectStore(PAGE_STORE)
     const page = (await reqToPromise(pageStore.get(id))) as PageEntry | undefined
     if (!page) throw new Error(`page not found: ${id}`)
     pageStore.delete(id)
+    tx.objectStore(OCR_STORE).delete(id)
     const blobStore = tx.objectStore(BLOB_STORE)
     blobStore.delete(page.blobId)
     if (page.thumbBlobId) blobStore.delete(page.thumbBlobId)
@@ -143,15 +171,22 @@ export class ImageStore {
   }
 
   async clearAll(): Promise<void> {
-    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
     tx.objectStore(PAGE_STORE).clear()
+    tx.objectStore(OCR_STORE).clear()
     tx.objectStore(BLOB_STORE).clear()
     await txDone(tx)
   }
 
   /** clearAll で失ったページとBlobを、そのままの内容で書き戻す(取り消し操作用)。 */
-  async restorePages(pages: PageEntry[], blobs: [string, Blob][]): Promise<void> {
-    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
+  async restorePages(
+    pages: PageEntry[],
+    blobs: [string, Blob][],
+    ocr: OcrResult[] = [],
+  ): Promise<void> {
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
+    const ocrStore = tx.objectStore(OCR_STORE)
+    for (const result of ocr) ocrStore.put(result)
     const blobStore = tx.objectStore(BLOB_STORE)
     for (const [id, blob] of blobs) blobStore.put(blob, id)
     const pageStore = tx.objectStore(PAGE_STORE)
@@ -183,13 +218,14 @@ export class ImageStore {
     const remaining = pages.filter((p) => !removed.has(p.id))
     const insertAt = remaining.filter((p) => p.order < pages[firstIndex].order).length
     remaining.splice(insertAt, 0, merged)
-    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE], 'readwrite')
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
     const blobStore = tx.objectStore(BLOB_STORE)
     const pageStore = tx.objectStore(PAGE_STORE)
     for (const id of removeIds) {
       const p = pages.find((page) => page.id === id)
       if (!p) throw new Error(`page not found: ${id}`)
       pageStore.delete(id)
+      tx.objectStore(OCR_STORE).delete(id)
       blobStore.delete(p.blobId)
       if (p.thumbBlobId) blobStore.delete(p.thumbBlobId)
     }
