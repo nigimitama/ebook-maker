@@ -27,19 +27,36 @@ interface AdjustedPreviewProps {
 // 適用した結果を見せる。書き出し結果に一番近いプレビューにするため。
 function AdjustedPreview({ image, adjustment }: AdjustedPreviewProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [ready, setReady] = useState(false)
 
+  // 画素演算は重いので、モーダルと「loading...」を先に描画してから遅延実行する。
   useEffect(() => {
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!canvas || !ctx) return
-    const preview = applyAdjustment(image, adjustment)
-    canvas.width = preview.width
-    canvas.height = preview.height
-    const imageData = new ImageData(new Uint8ClampedArray(preview.data), preview.width, preview.height)
-    ctx.putImageData(imageData, 0, 0)
+    setReady(false)
+    const timer = setTimeout(() => {
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx) return
+      const preview = applyAdjustment(image, adjustment)
+      canvas.width = preview.width
+      canvas.height = preview.height
+      const imageData = new ImageData(new Uint8ClampedArray(preview.data), preview.width, preview.height)
+      ctx.putImageData(imageData, 0, 0)
+      setReady(true)
+    }, 0)
+    return () => clearTimeout(timer)
   }, [image, adjustment])
 
-  return <canvas ref={canvasRef} data-testid="thumb-modal-canvas" className="thumb-modal__canvas" />
+  return (
+    <>
+      {!ready && <div className="thumb-modal__loading">loading...</div>}
+      <canvas
+        ref={canvasRef}
+        data-testid="thumb-modal-canvas"
+        className="thumb-modal__canvas"
+        style={ready ? undefined : { display: 'none' }}
+      />
+    </>
+  )
 }
 
 const MIN_ZOOM = 0.5
@@ -471,11 +488,7 @@ export function PageList({
               {previewPage.id === selectedPageId && selectedImage ? (
                 <AdjustedPreview image={selectedImage} adjustment={previewPage.adjustment} />
               ) : (
-                <img
-                  src={thumbnails[previewPage.id]}
-                  alt={`page ${previewPage.order + 1} preview`}
-                  draggable={false}
-                />
+                <div className="thumb-modal__loading">loading...</div>
               )}
             </ZoomPane>
             <button

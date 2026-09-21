@@ -5,6 +5,18 @@ import type { RawImage } from '../types'
 // リサンプリングするため、フル解像度のビットマップは一度も生成されない。
 // ユニットテストではなく preview-resolution のE2Eテストで担保している。
 
+// 画素配列は数MBあり、Reactの開発ビルドはpropsやstateの中身を性能トラック用に
+// 要素ごと走査するため、そのままpropsで渡すと選択のたびに数秒止まる。
+// `data` を列挙不可にすれば走査対象から外れる(参照・読み取りは通常どおり)。
+// スプレッドでコピーすると `data` が落ちるので、RawImageは丸ごと渡すこと。
+export function hideFromDevtools(image: RawImage): RawImage {
+  return Object.defineProperty(
+    { width: image.width, height: image.height } as RawImage,
+    'data',
+    { value: image.data, enumerable: false },
+  )
+}
+
 export interface Downscaled {
   /** 縮小した画素。調整キャンバスの描画やヒストグラム算出に使う。 */
   image: RawImage
@@ -15,12 +27,24 @@ export interface Downscaled {
   originalHeight: number
 }
 
-export async function downscale(blob: Blob, maxEdge: number): Promise<Downscaled> {
-  const probe = await createImageBitmap(blob)
-  const originalWidth = probe.width
-  const originalHeight = probe.height
+// knownSize を渡すと、寸法取得のためだけに行っていた原本のフルデコードを省ける。
+export async function downscale(
+  blob: Blob,
+  maxEdge: number,
+  knownSize?: { width: number; height: number },
+): Promise<Downscaled> {
+  let originalWidth: number
+  let originalHeight: number
+  if (knownSize) {
+    originalWidth = knownSize.width
+    originalHeight = knownSize.height
+  } else {
+    const probe = await createImageBitmap(blob)
+    originalWidth = probe.width
+    originalHeight = probe.height
+    probe.close()
+  }
   const target = fitWithin(originalWidth, originalHeight, maxEdge)
-  probe.close()
 
   const bitmap = await createImageBitmap(blob, {
     resizeWidth: target.width,

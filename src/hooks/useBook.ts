@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ImageStore } from '../lib/imageStore'
 import { decodeBlobToRawImage } from '../lib/decodeImage'
-import { downscale } from '../lib/downscaleImage'
+import { downscale, hideFromDevtools } from '../lib/downscaleImage'
 import { PREVIEW_MAX_EDGE, THUMBNAIL_MAX_EDGE } from '../lib/previewSizes'
 import { encodeRawImageToPng } from '../lib/encodeImage'
 import { computeAutoAdjustment } from '../lib/autoAdjust'
@@ -56,15 +56,23 @@ const RAW_IMAGE_CACHE_LIMIT = 4
 // スライダー操作が止まってから調整値を書き込むまでの待機時間。
 const ADJUSTMENT_WRITE_DEBOUNCE_MS = 250
 
+// 縮小済みプレビュー(約1200px・数MB)を何ページ分メモリに残すか。
+const PREVIEW_CACHE_LIMIT = 8
+
 export function useBook(): UseBookResult {
   const storeRef = useRef<ImageStore | null>(null)
   const storeOpeningRef = useRef<Promise<ImageStore> | null>(null)
   const rawImagesRef = useRef<Map<string, RawImage>>(new Map())
   const selectedPageIdRef = useRef<string | null>(null)
+  // 表示用に縮小した画素のキャッシュ(LRU)。ページの原本は不変なのでidをキーにできる。
+  const previewCacheRef = useRef<Map<string, RawImage>>(new Map())
+  const previewInflightRef = useRef<Map<string, Promise<RawImage | null>>>(new Map())
+  const pagesRef = useRef<PageEntry[]>([])
   const pendingAdjustmentsRef = useRef<
     Map<string, { timer: ReturnType<typeof setTimeout>; adjustment: AdjustmentParams }>
   >(new Map())
   const [pages, setPages] = useState<PageEntry[]>([])
+  pagesRef.current = pages
   const [thumbnails, setThumbnails] = useState<Record<string, string>>({})
   const [metadata, setMetadata] = useState<BookMetadata>({ title: '', author: '' })
   const [selectedPageId, setSelectedPageId] = useState<string | null>(null)
@@ -231,23 +239,64 @@ export function useBook(): UseBookResult {
   // 処理することになり、しかもスライダー操作のたびにその全画素へ
   // applyAdjustment が走る。見開き結合と書き出しは
   // ensureRawImage / Worker 経由で引き続き原本を使う。
+  const loadPreview = useCallback(
+    (id: string, store: ImageStore): Promise<RawImage | null> => {
+      const cache = previewCacheRef.current
+      const cached = cache.get(id)
+      if (cached) {
+        cache.delete(id)
+        cache.set(id, cached)
+        return Promise.resolve(cached)
+      }
+      const inflight = previewInflightRef.current.get(id)
+      if (inflight) return inflight
+      const task = (async () => {
+        // 通常は保持済みの一覧から引く。読み込み直後などで無ければストアを読み直す。
+        const page =
+          pagesRef.current.find((p) => p.id === id) ??
+          (await store.listPages()).find((p) => p.id === id)
+        if (!page) return null
+        const blob = await store.getBlob(page.blobId)
+        if (!blob) return null
+        // 寸法は登録時に保存済みなので、原本のフルデコードで測り直さない。
+        const { image } = await downscale(blob, PREVIEW_MAX_EDGE, {
+          width: page.width,
+          height: page.height,
+        })
+        const hidden = hideFromDevtools(image)
+        cache.set(id, hidden)
+        while (cache.size > PREVIEW_CACHE_LIMIT) {
+          const oldest = cache.keys().next().value
+          if (oldest === undefined || oldest === id) break
+          cache.delete(oldest)
+        }
+        return hidden
+      })().finally(() => previewInflightRef.current.delete(id))
+      previewInflightRef.current.set(id, task)
+      return task
+    },
+    [],
+  )
+
   const showPreview = useCallback(
     async (id: string, store: ImageStore) => {
       setSelected(id)
+      // キャッシュ済みなら待たずに同期で差し替える(一瞬の空白も出さない)。
+      const cached = previewCacheRef.current.get(id)
+      if (cached) {
+        setSelectedImage(cached)
+        void loadPreview(id, store) // LRUの並びを更新
+        return
+      }
       // 直前のページの画素をここで捨てる。残したままだと、デコードが終わるまでの間
       // 「前のページの画像」と「新しいページの調整値」が組み合わさって描画される。
       setSelectedImage(null)
-      const pages = await store.listPages()
-      const page = pages.find((p) => p.id === id)
-      if (!page) return
-      const blob = await store.getBlob(page.blobId)
-      if (!blob) return
-      const preview = await downscale(blob, PREVIEW_MAX_EDGE)
+      const preview = await loadPreview(id, store)
       // 待っている間にユーザーが別のページへ移っていたら、その選択を上書きしない。
-      if (selectedPageIdRef.current !== id) return
-      setSelectedImage(preview.image)
+      if (!preview || selectedPageIdRef.current !== id) return
+      setSelectedImage(preview)
     },
-    [setSelected],
+    [setSelected, loadPreview],
   )
 
   const importFiles = useCallback(
@@ -425,6 +474,7 @@ export function useBook(): UseBookResult {
       cancelPendingAdjustment(id)
       await store.deletePage(id)
       rawImagesRef.current.delete(id)
+      previewCacheRef.current.delete(id)
       setThumbnails((current) => {
         const next = { ...current }
         if (next[id]) URL.revokeObjectURL(next[id])
@@ -446,6 +496,7 @@ export function useBook(): UseBookResult {
     for (const entry of pendingAdjustmentsRef.current.values()) clearTimeout(entry.timer)
     pendingAdjustmentsRef.current.clear()
     rawImagesRef.current.clear()
+    previewCacheRef.current.clear()
     // 取り消し操作のために、消す前のページとBlobをすべて退避しておく。
     const snapshotPages = await store.listPages()
     const blobIds = new Set<string>()
@@ -516,6 +567,8 @@ export function useBook(): UseBookResult {
       cancelPendingAdjustment(secondId)
       rawImagesRef.current.delete(firstId)
       rawImagesRef.current.delete(secondId)
+      previewCacheRef.current.delete(firstId)
+      previewCacheRef.current.delete(secondId)
       cacheRawImage(mergedEntry.id, merged)
       setThumbnails((current) => {
         const next = { ...current }
@@ -528,7 +581,7 @@ export function useBook(): UseBookResult {
       })
       if (selectedPageId === firstId || selectedPageId === secondId) {
         setSelected(mergedEntry.id)
-        setSelectedImage((await downscale(blob, PREVIEW_MAX_EDGE)).image)
+        setSelectedImage(hideFromDevtools((await downscale(blob, PREVIEW_MAX_EDGE, merged)).image))
       }
       await refreshPages()
     },
