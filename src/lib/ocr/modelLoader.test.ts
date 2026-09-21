@@ -87,6 +87,13 @@ describe('resolveModelUrl', () => {
 
 // ONNXらしい中身(protobufなので先頭は 0x08)で、最小サイズを満たす本体
 const SIZE = MIN_MODEL_BYTES + 4
+
+// 1MiB級の Uint8Array を toEqual で比べると要素ごとの比較で遅く(約1秒)、
+// CIでは5秒のタイムアウトを超える。Buffer.compare なら一瞬で済む。
+function expectSameBytes(actual: Uint8Array | undefined, expected: Uint8Array) {
+  expect(actual).toBeDefined()
+  expect(Buffer.compare(actual as Uint8Array, expected)).toBe(0)
+}
 function modelBody(): Uint8Array {
   const body = new Uint8Array(SIZE)
   body[0] = 0x08
@@ -103,10 +110,10 @@ describe('loadModelBytes', () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const bytes = await loadModelBytes(URL_A)
-    expect(new Uint8Array(bytes)).toEqual(body)
+    expectSameBytes(new Uint8Array(bytes), body)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(openedNames).toEqual([MODEL_CACHE_NAME])
-    expect(cache.store.get(URL_A)?.bytes).toEqual(body)
+    expectSameBytes(cache.store.get(URL_A)?.bytes, body)
   })
 
   it('2回目はfetchせず保存済みを返す', async () => {
@@ -115,7 +122,7 @@ describe('loadModelBytes', () => {
 
     await loadModelBytes(URL_A)
     const second = await loadModelBytes(URL_A)
-    expect(new Uint8Array(second)).toEqual(body)
+    expectSameBytes(new Uint8Array(second), body)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 
@@ -151,7 +158,7 @@ describe('loadModelBytes', () => {
     const fetchMock = streamingFetch(body, 2)
     globalThis.fetch = fetchMock as unknown as typeof fetch
     const bytes = await loadModelBytes(URL_A)
-    expect(new Uint8Array(bytes)).toEqual(body)
+    expectSameBytes(new Uint8Array(bytes), body)
   })
 
   // Vite の dev/preview はモデルが無いとき index.html を 200 で返すので、
@@ -183,9 +190,9 @@ describe('loadModelBytes', () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const bytes = await loadModelBytes(URL_A)
-    expect(new Uint8Array(bytes)).toEqual(body)
+    expectSameBytes(new Uint8Array(bytes), body)
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(cache.store.get(URL_A)?.bytes).toEqual(body)
+    expectSameBytes(cache.store.get(URL_A)?.bytes, body)
   })
 
   it('壊れたキャッシュ(小さすぎる)も捨てて再取得する', async () => {
@@ -194,7 +201,7 @@ describe('loadModelBytes', () => {
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
     const bytes = await loadModelBytes(URL_A)
-    expect(new Uint8Array(bytes)).toEqual(body)
+    expectSameBytes(new Uint8Array(bytes), body)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
 })
