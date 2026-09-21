@@ -128,4 +128,10 @@ describe('ChaptersStep', () => {
     setup({ chapters: [{ id: 'c1', title: 'A', pageId: 'p2', level: 1 }] })
     expect(screen.getByText('目次を解析して章立てを置き換える')).toBeInTheDocument()
   })
+  it('keeps a hand-edited body offset when toc pages are toggled', () => {
+    setup()
+    fireEvent.change(screen.getByLabelText('本文1ページ目は画像何枚目か'), { target: { value: '7' } })
+    fireEvent.click(screen.getByLabelText('2枚目を目次ページにする'))
+    expect(screen.getByLabelText('本文1ページ目は画像何枚目か')).toHaveValue(7)
+  })
 })

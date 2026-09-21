@@ -58,7 +58,6 @@ export function ChaptersStep({
 
   function toggleToc(id: string, checked: boolean) {
     setTocPageIds((current) => (checked ? [...current, id] : current.filter((x) => x !== id)))
-    setBodyStartEdited(false)
   }
 
   function handleParse() {
