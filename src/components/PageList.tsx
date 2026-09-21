@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import type { CSSProperties } from 'react'
+import type { CSSProperties, ReactNode } from 'react'
 import { applyAdjustment } from '../lib/applyAdjustment'
 import { DEFAULT_JPEG_QUALITY } from '../types'
 import type { AdjustmentParams, PageEntry, RawImage } from '../types'
@@ -35,6 +35,89 @@ function AdjustedPreview({ image, adjustment }: AdjustedPreviewProps) {
   }, [image, adjustment])
 
   return <canvas ref={canvasRef} data-testid="thumb-modal-canvas" className="thumb-modal__canvas" />
+}
+
+const MIN_ZOOM = 0.5
+const MAX_ZOOM = 10
+
+// ホイール/ボタンで拡大縮小、ドラッグで移動、ダブルクリックでリセットできる表示枠。
+function ZoomPane({ children }: { children: ReactNode }) {
+  const paneRef = useRef<HTMLDivElement>(null)
+  const [view, setView] = useState({ scale: 1, x: 0, y: 0 })
+  const drag = useRef<{ px: number; py: number; x: number; y: number } | null>(null)
+
+  // (cx, cy) はペイン中心からの相対座標。その点を固定したまま倍率を変える。
+  function zoomAt(factor: number, cx: number, cy: number) {
+    setView((v) => {
+      const scale = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, v.scale * factor))
+      const ratio = scale / v.scale
+      return { scale, x: cx - (cx - v.x) * ratio, y: cy - (cy - v.y) * ratio }
+    })
+  }
+
+  useEffect(() => {
+    const pane = paneRef.current
+    if (!pane) return
+    // preventDefaultするため passive:false のネイティブリスナーで受ける。
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const rect = pane.getBoundingClientRect()
+      zoomAt(
+        Math.exp(-event.deltaY * 0.002),
+        event.clientX - rect.left - rect.width / 2,
+        event.clientY - rect.top - rect.height / 2,
+      )
+    }
+    pane.addEventListener('wheel', onWheel, { passive: false })
+    return () => pane.removeEventListener('wheel', onWheel)
+  }, [])
+
+  const reset = () => setView({ scale: 1, x: 0, y: 0 })
+
+  return (
+    <>
+      <div
+        ref={paneRef}
+        className="zoom-pane"
+        data-testid="zoom-pane"
+        onDoubleClick={reset}
+        onPointerDown={(event) => {
+          event.currentTarget.setPointerCapture(event.pointerId)
+          drag.current = { px: event.clientX, py: event.clientY, x: view.x, y: view.y }
+        }}
+        onPointerMove={(event) => {
+          const d = drag.current
+          if (!d) return
+          setView((v) => ({ ...v, x: d.x + event.clientX - d.px, y: d.y + event.clientY - d.py }))
+        }}
+        onPointerUp={() => {
+          drag.current = null
+        }}
+        onPointerCancel={() => {
+          drag.current = null
+        }}
+      >
+        <div
+          className="zoom-pane__content"
+          style={{ transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})` }}
+        >
+          {children}
+        </div>
+      </div>
+      <div className="zoom-pane__controls">
+        <button type="button" className="btn-ghost" onClick={() => zoomAt(1 / 1.5, 0, 0)} aria-label="縮小">
+          −
+        </button>
+        <span>{Math.round(view.scale * 100)}%</span>
+        <button type="button" className="btn-ghost" onClick={() => zoomAt(1.5, 0, 0)} aria-label="拡大">
+          ＋
+        </button>
+        <button type="button" className="btn-ghost" onClick={reset}>
+          リセット
+        </button>
+      </div>
+    </>
+  )
 }
 
 function resizeLabel(adjustment: AdjustmentParams): string | null {
@@ -379,11 +462,17 @@ export function PageList({
           onClick={() => setPreviewPageId(null)}
         >
           <div className="thumb-modal__frame" onClick={(event) => event.stopPropagation()}>
-            {previewPage.id === selectedPageId && selectedImage ? (
-              <AdjustedPreview image={selectedImage} adjustment={previewPage.adjustment} />
-            ) : (
-              <img src={thumbnails[previewPage.id]} alt={`page ${previewPage.order + 1} preview`} />
-            )}
+            <ZoomPane>
+              {previewPage.id === selectedPageId && selectedImage ? (
+                <AdjustedPreview image={selectedImage} adjustment={previewPage.adjustment} />
+              ) : (
+                <img
+                  src={thumbnails[previewPage.id]}
+                  alt={`page ${previewPage.order + 1} preview`}
+                  draggable={false}
+                />
+              )}
+            </ZoomPane>
             <button
               type="button"
               className="thumb-modal__close"

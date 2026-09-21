@@ -480,6 +480,35 @@ label {
   margin: 0 auto;
 }
 
+.zoom-pane {
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 75vh;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.zoom-pane:active {
+  cursor: grabbing;
+}
+
+.zoom-pane__content {
+  display: flex;
+  max-width: 100%;
+  max-height: 100%;
+  transform-origin: center;
+}
+
+.zoom-pane__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
 .thumb-modal__close {
   align-self: flex-end;
 }
