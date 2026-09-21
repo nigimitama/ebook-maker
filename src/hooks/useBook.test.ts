@@ -204,6 +204,22 @@ describe('useBook', () => {
     expect(await store!.listOcr()).toEqual([ocr])
   })
 
+  it('restores chapters when undoing clear-all', async () => {
+    const view = await importPages([imageFile('a.png', [1, 2, 3, 255])])
+    const [page] = view.result.current.pages
+    const store = await view.result.current.getStore()
+    const chapters = [{ id: 'c1', title: '第1章', pageId: page.id, level: 1 }]
+    await store!.putChapters(chapters)
+    await act(async () => {
+      await view.result.current.clearAllPages()
+    })
+    expect(await store!.listChapters()).toEqual([])
+    await act(async () => {
+      await view.result.current.undoClearAll()
+    })
+    expect(await store!.listChapters()).toEqual(chapters)
+  })
+
   it('bakes each page’s adjustment into the pixels when merging a spread', async () => {
     const view = await importPages([
       imageFile('left.png', [10, 20, 30, 255]),
