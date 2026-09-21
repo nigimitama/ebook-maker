@@ -39,6 +39,7 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   // 並べ替え・調整 → OCR確認・修正 → 詳細&書き出し
   await page.getByText('OCRへ進む').click()
   await expect(page.getByText('このページをOCR')).toBeVisible()
+  await page.getByText('章立てへ進む').click()
   await page.getByText('詳細情報へ進む').click()
   await page.getByTestId('title-input').fill('E2E Test Book')
   await page.getByTestId('author-input').fill('E2E Author')

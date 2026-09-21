@@ -61,10 +61,10 @@ describe('App', () => {
     expect(screen.getByText('見開き結合')).toBeInTheDocument()
   })
 
-  it('shows the four steps of the flow', () => {
+  it('shows the five steps of the flow', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
     render(<App />)
-    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '詳細＆書き出し']) {
+    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '章立て', '詳細＆書き出し']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -79,15 +79,30 @@ describe('App', () => {
     expect(screen.getByText('このページをOCR')).toBeInTheDocument()
   })
 
-  it('advances from the OCR確認・修正 step to 詳細＆書き出し', () => {
+  it('advances from the OCR確認・修正 step to the 章立て step, then to 詳細＆書き出し', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('章立てへ進む'))
+    expect(screen.getByText('章を追加')).toBeInTheDocument()
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
+  })
+
+  // 章立ても任意工程。OCR確認から直接書き出しへ進める。
+  it('lets the user skip the 章立て step', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('章立てをスキップして書き出しへ'))
+    expect(screen.getByText('書き出し')).toBeInTheDocument()
+    expect(screen.queryByText('章を追加')).not.toBeInTheDocument()
   })
 
   // OCRは任意工程。飛ばしても書き出しに進める。
@@ -102,16 +117,17 @@ describe('App', () => {
     expect(screen.queryByText('このページをOCR')).not.toBeInTheDocument()
   })
 
-  it('returns from the 書き出し step to the OCR確認・修正 step', () => {
+  it('returns from the 書き出し step to the 章立て step', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('章立てへ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
-    fireEvent.click(screen.getByText('OCR確認へ戻る'))
-    expect(screen.getByText('このページをOCR')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('章立てへ戻る'))
+    expect(screen.getByText('章を追加')).toBeInTheDocument()
   })
 
   it('shows the AdjustmentEditor on the 並べ替え・調整 step once a page is selected and its image is loaded', () => {

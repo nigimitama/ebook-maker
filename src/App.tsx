@@ -6,11 +6,13 @@ import { PageList } from './components/PageList'
 import { AdjustmentEditor } from './components/AdjustmentEditor'
 import { OcrReview } from './components/OcrReview'
 import { MetadataForm } from './components/MetadataForm'
+import { useChapters } from './hooks/useChapters'
+import { ChaptersStep } from './components/ChaptersStep'
 import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
-const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', '詳細＆書き出し'] as const
+const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', '章立て', '詳細＆書き出し'] as const
 
 export function App() {
   const book = useBook()
@@ -21,6 +23,7 @@ export function App() {
   // 配列そのものを渡すと毎描画で別参照になるため、IDの並びで memo する。
   const pageIds = useMemo(() => book.pages.map((p) => p.id), [book.pages])
   const ocr = useOcr(book.getStore, { pageIds })
+  const chapters = useChapters(book.getStore, { pageIds })
 
   function goTo(next: number) {
     setStep(next)
@@ -128,7 +131,7 @@ export function App() {
                   OCRへ進む
                 </button>
                 {/* OCRは任意工程。使わない人がここで詰まらないよう、書き出しへ直行できる。 */}
-                <button type="button" className="btn btn-ghost" onClick={() => goTo(3)}>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
                   OCRをスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
@@ -139,7 +142,11 @@ export function App() {
             {step === 2 && (
               <>
                 <button type="button" className="btn btn-primary" onClick={() => goTo(3)}>
-                  詳細情報へ進む
+                  章立てへ進む
+                </button>
+                {/* 章立ても任意工程。既存の章立ては消さずに書き出しへ進む。 */}
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
+                  章立てをスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
                   戻る
@@ -147,8 +154,18 @@ export function App() {
               </>
             )}
             {step === 3 && (
-              <button type="button" className="btn btn-ghost" onClick={() => goTo(2)}>
-                OCR確認へ戻る
+              <>
+                <button type="button" className="btn btn-primary" onClick={() => goTo(4)}>
+                  詳細情報へ進む
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(2)}>
+                  戻る
+                </button>
+              </>
+            )}
+            {step === 4 && (
+              <button type="button" className="btn btn-ghost" onClick={() => goTo(3)}>
+                章立てへ戻る
               </button>
             )}
           </div>
@@ -220,9 +237,25 @@ export function App() {
           )}
 
           {step === 3 && (
+            <ChaptersStep
+              pages={book.pages}
+              thumbnails={book.thumbnails}
+              ocrResults={ocr.results}
+              ocrRunning={ocr.running}
+              onRunOcr={(ids) => void ocr.runAll(ids, { skipDone: true })}
+              chapters={chapters.chapters}
+              onChange={(next) => void chapters.setChapters(next)}
+            />
+          )}
+
+          {step === 4 && (
             <>
               <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
-              <ExportPanel onExport={book.exportBook} title={book.metadata.title} />
+              <ExportPanel
+                onExport={book.exportBook}
+                title={book.metadata.title}
+                chapterCount={chapters.chapters.length}
+              />
             </>
           )}
         </div>
