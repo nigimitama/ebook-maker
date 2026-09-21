@@ -7,6 +7,7 @@ import { encodeRawImageToPng } from '../lib/encodeImage'
 import { computeAutoAdjustment } from '../lib/autoAdjust'
 import { applyAdjustment } from '../lib/applyAdjustment'
 import { mergeSpread } from '../lib/mergeSpread'
+import { toExportChapters } from '../lib/toc/chapters'
 import { runExportInWorker } from '../lib/exportRunner'
 import type { ExportRequestPage } from '../workers/exportCore'
 import type { OcrResult } from '../lib/ocr/types'
@@ -34,7 +35,11 @@ export interface UseBookResult {
   undoClearAll: () => Promise<void>
   confirmMerge: (firstId: string, secondId: string) => Promise<void>
   setMetadata: (metadata: BookMetadata) => void
-  exportBook: (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => Promise<Blob>
+  exportBook: (
+    format: 'pdf' | 'epub',
+    onProgress?: (done: number, total: number) => void,
+    options?: { embedChapters?: boolean },
+  ) => Promise<Blob>
   importProgress: { done: number; total: number } | null
   error: string | null
   clearError: () => void
@@ -616,7 +621,11 @@ export function useBook(): UseBookResult {
   )
 
   const exportBook = useCallback(
-    async (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => {
+    async (
+      format: 'pdf' | 'epub',
+      onProgress?: (done: number, total: number) => void,
+      options?: { embedChapters?: boolean },
+    ) => {
       const store = storeRef.current
       if (!store) throw new Error('store not ready')
       // スライダー操作直後の書き出しで、遅延待ちのままの最後の調整値を
@@ -631,7 +640,14 @@ export function useBook(): UseBookResult {
         if (!blob) throw new Error(`image data not found for page: ${page.id}`)
         exportPages.push({ blob, adjustment: page.adjustment })
       }
-      return runExportInWorker({ format, metadata, pages: exportPages }, onProgress)
+      const chapters =
+        options?.embedChapters === false
+          ? []
+          : toExportChapters(
+              await store.listChapters(),
+              currentPages.map((p) => p.id),
+            )
+      return runExportInWorker({ format, metadata, pages: exportPages, chapters }, onProgress)
     },
     [metadata, flushPendingAdjustments],
   )

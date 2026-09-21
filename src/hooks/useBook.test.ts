@@ -322,4 +322,29 @@ describe('useBook', () => {
       height: 1,
     })
   })
+
+  it('passes chapters converted to page indexes to the export worker, unless embedding is off', async () => {
+    const view = await importPages([
+      imageFile('a.png', [1, 2, 3, 255]),
+      imageFile('b.png', [4, 5, 6, 255]),
+    ])
+    const [, second] = view.result.current.pages
+    const store = await view.result.current.getStore()
+    await store!.putChapters([
+      { id: 'c1', title: '第1章', pageId: second.id, level: 1 },
+      { id: 'c2', title: '消えたページ', pageId: 'gone', level: 1 },
+    ])
+    vi.mocked(runExportInWorker).mockClear()
+    await act(async () => {
+      await view.result.current.exportBook('pdf')
+    })
+    expect(vi.mocked(runExportInWorker).mock.calls[0][0].chapters).toEqual([
+      { title: '第1章', pageIndex: 1, level: 1 },
+    ])
+    vi.mocked(runExportInWorker).mockClear()
+    await act(async () => {
+      await view.result.current.exportBook('pdf', undefined, { embedChapters: false })
+    })
+    expect(vi.mocked(runExportInWorker).mock.calls[0][0].chapters).toEqual([])
+  })
 })

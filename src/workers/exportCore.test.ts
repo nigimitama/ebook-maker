@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { runExport } from './exportCore'
-import { PDFDocument } from 'pdf-lib'
+import { PDFDocument, PDFName } from 'pdf-lib'
 import JSZip from 'jszip'
 import type { RawImage } from '../types'
 import { decodeBase64Jpeg } from '../test/jpegFixture'
@@ -34,6 +34,24 @@ describe('runExport', () => {
     const doc = await PDFDocument.load(bytes)
     expect(doc.getPageCount()).toBe(2)
     expect(doc.getTitle()).toBe('T')
+  })
+
+  it('embeds chapters into the PDF outline', async () => {
+    const bytes = await runExport(
+      {
+        format: 'pdf',
+        metadata: { title: 'T', author: 'A' },
+        pages: [
+          { blob: new Blob(['a']), adjustment: { brightness: 0, contrast: 0 } },
+          { blob: new Blob(['b']), adjustment: { brightness: 0, contrast: 0 } },
+        ],
+        chapters: [{ title: '第1章', pageIndex: 1, level: 1 }],
+      },
+      fakeEncode,
+      fakeDecode,
+    )
+    const doc = await PDFDocument.load(bytes)
+    expect(doc.catalog.has(PDFName.of('Outlines'))).toBe(true)
   })
 
   it('builds an EPUB when format is epub', async () => {

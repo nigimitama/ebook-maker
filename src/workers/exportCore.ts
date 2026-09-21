@@ -2,7 +2,7 @@ import { applyAdjustment } from '../lib/applyAdjustment'
 import { buildPdf, type ExportPage } from '../lib/pdfExport'
 import { buildEpub } from '../lib/epubExport'
 import { DEFAULT_JPEG_QUALITY } from '../types'
-import type { AdjustmentParams, BookMetadata, RawImage } from '../types'
+import type { AdjustmentParams, BookMetadata, ExportChapter, RawImage } from '../types'
 
 // ページはデコード済みRGBA画素ではなく、原本のBlobと調整パラメータの形で
 // Workerへ渡す。構造化複製は Uint8ClampedArray をバイト単位でコピーする
@@ -18,6 +18,8 @@ export interface ExportRequest {
   format: 'pdf' | 'epub'
   metadata: BookMetadata
   pages: ExportRequestPage[]
+  // しおり・目次に埋め込む章。書き出し順のページindexで持つ。未指定・空なら従来どおり。
+  chapters?: ExportChapter[]
 }
 
 export type JpegEncoder = (image: RawImage, quality: number) => Promise<Uint8Array>
@@ -41,6 +43,6 @@ export async function runExport(
     onProgress?.(index + 1, total)
   }
   return request.format === 'pdf'
-    ? buildPdf(exportPages, request.metadata)
-    : buildEpub(exportPages, request.metadata)
+    ? buildPdf(exportPages, request.metadata, request.chapters)
+    : buildEpub(exportPages, request.metadata, request.chapters)
 }
