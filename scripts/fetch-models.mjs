@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { MODEL_FILES, sha256Hex, verifyHash } from './modelFiles.mjs'
+import { MODEL_FILES, verifyHash } from './modelFiles.mjs'
+import { fetchVerified } from './fetchWithFallback.mjs'
 
 async function readIfExists(path) {
   try {
@@ -17,13 +18,9 @@ for (const f of MODEL_FILES) {
     console.log(`skip  ${f.dest}`)
     continue
   }
-  console.log(`fetch ${f.url}`)
-  const res = await fetch(f.url)
-  if (!res.ok) throw new Error(`download failed: ${res.status} ${f.url}`)
-  const buf = Buffer.from(await res.arrayBuffer())
-  if (!verifyHash(buf, f.sha256)) {
-    throw new Error(`SHA-256 mismatch for ${f.dest}: expected ${f.sha256}, got ${sha256Hex(buf)}`)
-  }
+  console.log(`fetch ${f.dest}`)
+  // sources は先頭が一次(公式)。取得失敗・ハッシュ不一致なら次のソースへ回る。
+  const buf = await fetchVerified(f.sources, f.sha256)
   await mkdir(dirname(f.dest), { recursive: true })
   await writeFile(f.dest, buf)
   console.log(`ok    ${f.dest}`)
