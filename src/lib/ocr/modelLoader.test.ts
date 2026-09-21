@@ -1,18 +1,33 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { loadModelBytes, resolveModelUrl, MODEL_CACHE_NAME } from './modelLoader'
+import {
+  loadModelBytes,
+  evictModel,
+  resolveModelUrl,
+  MODEL_CACHE_NAME,
+  MIN_MODEL_BYTES,
+} from './modelLoader'
 
-// Cache API の最小の偽物。put/match だけ使う。
+// Cache API の最小の偽物。match/put/delete だけ使う。
 class FakeCache {
-  store = new Map<string, Uint8Array>()
+  store = new Map<string, { bytes: Uint8Array; contentType: string }>()
   async match(url: string): Promise<Response | undefined> {
-    const bytes = this.store.get(url)
-    if (!bytes) return undefined
-    return new Response(bytes.slice().buffer as ArrayBuffer, {
-      headers: { 'Content-Length': String(bytes.length) },
+    const entry = this.store.get(url)
+    if (!entry) return undefined
+    return new Response(entry.bytes.slice().buffer as ArrayBuffer, {
+      headers: {
+        'Content-Length': String(entry.bytes.length),
+        'Content-Type': entry.contentType,
+      },
     })
   }
   async put(url: string, res: Response): Promise<void> {
-    this.store.set(url, new Uint8Array(await res.arrayBuffer()))
+    this.store.set(url, {
+      bytes: new Uint8Array(await res.arrayBuffer()),
+      contentType: res.headers.get('Content-Type') ?? 'application/octet-stream',
+    })
+  }
+  async delete(url: string): Promise<boolean> {
+    return this.store.delete(url)
   }
 }
 
@@ -35,7 +50,7 @@ function setCaches() {
 }
 
 // Content-Length 付きでチャンク分割して返す fetch の偽物
-function streamingFetch(body: Uint8Array, chunks: number) {
+function streamingFetch(body: Uint8Array, chunks: number, contentType = 'application/octet-stream') {
   return vi.fn(async () => {
     const size = Math.ceil(body.length / chunks)
     let offset = 0
@@ -51,7 +66,7 @@ function streamingFetch(body: Uint8Array, chunks: number) {
     })
     return new Response(stream, {
       status: 200,
-      headers: { 'Content-Length': String(body.length) },
+      headers: { 'Content-Length': String(body.length), 'Content-Type': contentType },
     })
   })
 }
@@ -70,29 +85,36 @@ describe('resolveModelUrl', () => {
   })
 })
 
+// ONNXらしい中身(protobufなので先頭は 0x08)で、最小サイズを満たす本体
+const SIZE = MIN_MODEL_BYTES + 4
+function modelBody(): Uint8Array {
+  const body = new Uint8Array(SIZE)
+  body[0] = 0x08
+  for (let i = 1; i < SIZE; i += 1) body[i] = i % 251
+  return body
+}
+
 describe('loadModelBytes', () => {
-  const body = new Uint8Array(40)
-  body.forEach((_, i) => {
-    body[i] = i
-  })
+  const body = modelBody()
+  const URL_A = 'https://example.test/m.onnx'
 
   it('1回目はfetchしてCache APIに保存する', async () => {
     const fetchMock = streamingFetch(body, 4)
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
-    const bytes = await loadModelBytes('https://example.test/m.onnx')
+    const bytes = await loadModelBytes(URL_A)
     expect(new Uint8Array(bytes)).toEqual(body)
     expect(fetchMock).toHaveBeenCalledTimes(1)
     expect(openedNames).toEqual([MODEL_CACHE_NAME])
-    expect(cache.store.get('https://example.test/m.onnx')).toEqual(body)
+    expect(cache.store.get(URL_A)?.bytes).toEqual(body)
   })
 
   it('2回目はfetchせず保存済みを返す', async () => {
     const fetchMock = streamingFetch(body, 4)
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
-    await loadModelBytes('https://example.test/m.onnx')
-    const second = await loadModelBytes('https://example.test/m.onnx')
+    await loadModelBytes(URL_A)
+    const second = await loadModelBytes(URL_A)
     expect(new Uint8Array(second)).toEqual(body)
     expect(fetchMock).toHaveBeenCalledTimes(1)
   })
@@ -100,21 +122,22 @@ describe('loadModelBytes', () => {
   it('onProgress が Content-Length を total として進捗を報告する', async () => {
     globalThis.fetch = streamingFetch(body, 4) as unknown as typeof fetch
     const calls: Array<[number, number]> = []
-    await loadModelBytes('https://example.test/m.onnx', (received, total) => calls.push([received, total]))
+    await loadModelBytes(URL_A, (received, total) => calls.push([received, total]))
+    const chunk = Math.ceil(SIZE / 4)
     expect(calls).toEqual([
-      [10, 40],
-      [20, 40],
-      [30, 40],
-      [40, 40],
+      [chunk, SIZE],
+      [chunk * 2, SIZE],
+      [chunk * 3, SIZE],
+      [SIZE, SIZE],
     ])
   })
 
   it('キャッシュ命中時も完了として進捗を1回報告する', async () => {
     globalThis.fetch = streamingFetch(body, 4) as unknown as typeof fetch
-    await loadModelBytes('https://example.test/m.onnx')
+    await loadModelBytes(URL_A)
     const calls: Array<[number, number]> = []
-    await loadModelBytes('https://example.test/m.onnx', (received, total) => calls.push([received, total]))
-    expect(calls).toEqual([[40, 40]])
+    await loadModelBytes(URL_A, (received, total) => calls.push([received, total]))
+    expect(calls).toEqual([[SIZE, SIZE]])
   })
 
   it('HTTPエラーなら例外を投げ、キャッシュに入れない', async () => {
@@ -127,7 +150,75 @@ describe('loadModelBytes', () => {
     Object.defineProperty(globalThis, 'caches', { configurable: true, value: undefined })
     const fetchMock = streamingFetch(body, 2)
     globalThis.fetch = fetchMock as unknown as typeof fetch
-    const bytes = await loadModelBytes('https://example.test/m.onnx')
+    const bytes = await loadModelBytes(URL_A)
     expect(new Uint8Array(bytes)).toEqual(body)
+  })
+
+  // Vite の dev/preview はモデルが無いとき index.html を 200 で返すので、
+  // それをモデルとしてキャッシュしてしまうと永久に壊れたままになる。
+  it('200で返るHTML(dev/previewのSPAフォールバック)は拒否し、キャッシュしない', async () => {
+    const html = new TextEncoder().encode('<!doctype html><html><body>app</body></html>')
+    globalThis.fetch = streamingFetch(html, 1, 'text/html') as unknown as typeof fetch
+    await expect(loadModelBytes(URL_A)).rejects.toThrow(/HTML/)
+    expect(cache.store.size).toBe(0)
+  })
+
+  it('Content-Typeが正しくても中身がHTMLなら拒否する', async () => {
+    const html = new TextEncoder().encode(`<!doctype html>${'x'.repeat(SIZE)}`)
+    globalThis.fetch = streamingFetch(html, 2) as unknown as typeof fetch
+    await expect(loadModelBytes(URL_A)).rejects.toThrow(/HTML/)
+    expect(cache.store.size).toBe(0)
+  })
+
+  it('小さすぎる応答はモデルとみなさず拒否する', async () => {
+    globalThis.fetch = streamingFetch(new Uint8Array([8, 1, 2, 3]), 1) as unknown as typeof fetch
+    await expect(loadModelBytes(URL_A)).rejects.toThrow(/小さ/)
+    expect(cache.store.size).toBe(0)
+  })
+
+  it('壊れたキャッシュ(HTMLが入っている)は捨てて再取得する', async () => {
+    const html = new TextEncoder().encode('<!doctype html><html></html>')
+    cache.store.set(URL_A, { bytes: html, contentType: 'text/html' })
+    const fetchMock = streamingFetch(body, 2)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const bytes = await loadModelBytes(URL_A)
+    expect(new Uint8Array(bytes)).toEqual(body)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(cache.store.get(URL_A)?.bytes).toEqual(body)
+  })
+
+  it('壊れたキャッシュ(小さすぎる)も捨てて再取得する', async () => {
+    cache.store.set(URL_A, { bytes: new Uint8Array(16), contentType: 'application/octet-stream' })
+    const fetchMock = streamingFetch(body, 2)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+
+    const bytes = await loadModelBytes(URL_A)
+    expect(new Uint8Array(bytes)).toEqual(body)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('evictModel', () => {
+  it('保存済みのモデルを消し、次回は再取得になる', async () => {
+    const body = modelBody()
+    const fetchMock = streamingFetch(body, 2)
+    globalThis.fetch = fetchMock as unknown as typeof fetch
+    const url = 'https://example.test/broken.onnx'
+
+    await loadModelBytes(url)
+    expect(cache.store.has(url)).toBe(true)
+
+    // セッション生成に失敗したときの想定(壊れたバイト列だった)
+    await evictModel(url)
+    expect(cache.store.has(url)).toBe(false)
+
+    await loadModelBytes(url)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
+  })
+
+  it('Cache APIが無くても例外にしない', async () => {
+    Object.defineProperty(globalThis, 'caches', { configurable: true, value: undefined })
+    await expect(evictModel('https://example.test/x.onnx')).resolves.toBeUndefined()
   })
 })

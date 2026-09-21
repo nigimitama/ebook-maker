@@ -7,7 +7,7 @@
 import * as ort from 'onnxruntime-web/wasm'
 import wasmUrl from 'onnxruntime-web/ort-wasm-simd-threaded.wasm?url'
 import type { RawImage } from '../types'
-import { loadModelBytes, resolveModelUrl } from '../lib/ocr/modelLoader'
+import { evictModel, loadModelBytes, resolveModelUrl } from '../lib/ocr/modelLoader'
 import type { OcrWorkerRequest, OcrWorkerResponse } from '../lib/ocr/ocrMessages'
 import { OCR_CONFIG, type RecognizerKey } from '../lib/ocr/ocrConfig'
 import { runOcr, type OcrSessions } from '../lib/ocr/ocrPipeline'
@@ -73,8 +73,16 @@ function loadCharset(): Promise<string[]> {
 }
 
 async function createSession(siteRelativeUrl: string): Promise<ort.InferenceSession> {
-  const bytes = await loadModelBytes(resolveModelUrl(siteRelativeUrl))
-  return ort.InferenceSession.create(bytes, SESSION_OPTIONS)
+  const url = resolveModelUrl(siteRelativeUrl)
+  const bytes = await loadModelBytes(url)
+  try {
+    return await ort.InferenceSession.create(bytes, SESSION_OPTIONS)
+  } catch (error) {
+    // 保存していたバイト列が壊れていた可能性があるので捨てる。
+    // これをしないと壊れたキャッシュを永久に読み続けてしまう。
+    await evictModel(url)
+    throw error
+  }
 }
 
 function loadLayout(): Promise<ort.InferenceSession> {
@@ -95,56 +103,65 @@ function loadRecognizer(key: RecognizerKey): Promise<ort.InferenceSession> {
   return promise
 }
 
-let recognizeAnnounced = false
-
-const sessions: OcrSessions = {
-  async detect(tensor, size) {
-    const session = await loadLayout()
-    // DEIM は images [1,3,size,size] と orig_target_sizes int64 [1,2] を取る。
-    const out = await session.run({
-      [session.inputNames[0]]: new ort.Tensor('float32', tensor, [1, 3, size, size]),
-      [session.inputNames[1]]: new ort.Tensor(
-        'int64',
-        BigInt64Array.from([BigInt(size), BigInt(size)]),
-        [1, 2],
-      ),
-    })
-    // 出力順は labels(int64, 1始まり) / boxes(float32) / scores / char_count(int64)。
-    const [labels, boxes, scores, charCount] = session.outputNames
-    return {
-      classIds: out[labels].data as BigInt64Array,
-      boxes: out[boxes].data as Float32Array,
-      scores: out[scores].data as Float32Array,
-      charCounts: charCount ? (out[charCount].data as BigInt64Array) : undefined,
-    }
-  },
-  async recognize(key, tensor) {
-    const spec = OCR_CONFIG.recognizers[key]
-    const session = await loadRecognizer(key)
-    if (!recognizeAnnounced) {
-      recognizeAnnounced = true
-      post({ type: 'stage', stage: 'recognizing' })
-    }
-    const out = await session.run({
-      [session.inputNames[0]]: new ort.Tensor('float32', tensor, [1, 3, spec.height, spec.width]),
-    })
-    // 出力名はビルド依存の数値なので outputNames[0] で引く。
-    const logits = out[session.outputNames[0]]
-    const [, seqLen, vocab] = logits.dims
-    return { logits: logits.data as Float32Array, seqLen, vocab }
-  },
+// 要求ごとに作る(応答に載せる id と、'recognizing' を1回だけ流すための
+// フラグを閉じ込めるため)。セッション自体は上のモジュール変数で使い回す。
+function createSessions(requestId: number): OcrSessions {
+  let recognizeAnnounced = false
+  return {
+    async detect(tensor, size) {
+      const session = await loadLayout()
+      // DEIM は images [1,3,size,size] と orig_target_sizes int64 [1,2] を取る。
+      const out = await session.run({
+        [session.inputNames[0]]: new ort.Tensor('float32', tensor, [1, 3, size, size]),
+        [session.inputNames[1]]: new ort.Tensor(
+          'int64',
+          BigInt64Array.from([BigInt(size), BigInt(size)]),
+          [1, 2],
+        ),
+      })
+      // 出力順は labels(int64, 1始まり) / boxes(float32) / scores / char_count(int64)。
+      const [labels, boxes, scores, charCount] = session.outputNames
+      return {
+        classIds: out[labels].data as BigInt64Array,
+        boxes: out[boxes].data as Float32Array,
+        scores: out[scores].data as Float32Array,
+        charCounts: charCount ? (out[charCount].data as BigInt64Array) : undefined,
+      }
+    },
+    async recognize(key, tensor) {
+      const spec = OCR_CONFIG.recognizers[key]
+      const session = await loadRecognizer(key)
+      if (!recognizeAnnounced) {
+        recognizeAnnounced = true
+        post({ type: 'stage', id: requestId, stage: 'recognizing' })
+      }
+      const out = await session.run({
+        [session.inputNames[0]]: new ort.Tensor('float32', tensor, [1, 3, spec.height, spec.width]),
+      })
+      // 出力名はビルド依存の数値なので outputNames[0] で引く。
+      const logits = out[session.outputNames[0]]
+      const [, seqLen, vocab] = logits.dims
+      return { logits: logits.data as Float32Array, seqLen, vocab }
+    },
+  }
 }
 
 self.onmessage = async (event: MessageEvent<OcrWorkerRequest>) => {
+  // id は応答にそのまま載せ返す(メインスレッドが古い応答を捨てられるように)。
+  const { id, blob } = event.data
   try {
-    post({ type: 'stage', stage: 'loading-models' })
+    post({ type: 'stage', id, stage: 'loading-models' })
     const [charset] = await Promise.all([loadCharset(), loadLayout()])
-    recognizeAnnounced = false
-    post({ type: 'stage', stage: 'detecting' })
-    const image = await decodeBlobViaCanvas(event.data.blob)
-    const { lines } = await runOcr(image, sessions, charset)
-    post({ ok: true, lines })
+    post({ type: 'stage', id, stage: 'detecting' })
+    const image = await decodeBlobViaCanvas(blob)
+    const { lines } = await runOcr(image, createSessions(id), charset)
+    post({ type: 'done', id, ok: true, lines })
   } catch (error) {
-    post({ ok: false, error: error instanceof Error ? error.message : String(error) })
+    post({
+      type: 'done',
+      id,
+      ok: false,
+      error: error instanceof Error ? error.message : String(error),
+    })
   }
 }
