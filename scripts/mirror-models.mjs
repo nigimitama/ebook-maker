@@ -2,12 +2,19 @@
 import { readFile } from 'node:fs/promises'
 import { spawnSync } from 'node:child_process'
 import { MODEL_FILES, verifyHash } from './modelFiles.mjs'
-import { buildMirrorPlan } from './mirrorPlan.mjs'
+import { buildMirrorPlan, validateBucket, wranglerCommand } from './mirrorPlan.mjs'
 
 const execute = process.argv.includes('--execute')
 const bucket = process.env.R2_BUCKET
 if (!bucket) {
   console.error('R2_BUCKET 環境変数が未設定です')
+  process.exit(1)
+}
+
+try {
+  validateBucket(bucket)
+} catch (e) {
+  console.error(e.message)
   process.exit(1)
 }
 
@@ -37,7 +44,10 @@ for (const p of plan) {
 
 for (const p of plan) {
   console.log(`put ${p.key}`)
-  const r = spawnSync('npx', ['wrangler', ...p.wranglerArgs], { stdio: 'inherit', shell: process.platform === 'win32' })
+  // シェルは使わない(引数の分割・コマンド注入を避ける)
+  const { command, args } = wranglerCommand(p.wranglerArgs)
+  const r = spawnSync(command, args, { stdio: 'inherit' })
+  if (r.error) console.error(r.error)
   if (r.status !== 0) {
     console.error(`中止: wrangler が失敗しました(${p.key})`)
     process.exit(r.status ?? 1)
