@@ -99,6 +99,33 @@ export function App() {
               )
             })}
           </div>
+          <div className="rail__nav">
+            {step === 0 && (
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={book.pages.length === 0}
+                onClick={() => goTo(1)}
+              >
+                次へ
+              </button>
+            )}
+            {step === 1 && (
+              <>
+                <button type="button" className="btn btn-primary" onClick={() => goTo(2)}>
+                  詳細情報へ進む
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
+                  戻る
+                </button>
+              </>
+            )}
+            {step === 2 && (
+              <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
+                ページ編集へ戻る
+              </button>
+            )}
+          </div>
         </nav>
 
         <div className="step-content">
@@ -112,16 +139,6 @@ export function App() {
                 onUndoClearAll={book.undoClearAll}
                 importProgress={book.importProgress}
               />
-              <div className="nav-actions nav-actions--end">
-                <button
-                  type="button"
-                  className="btn btn-primary"
-                  disabled={book.pages.length === 0}
-                  onClick={() => goTo(1)}
-                >
-                  次へ
-                </button>
-              </div>
             </>
           )}
 
@@ -161,14 +178,6 @@ export function App() {
                     ))}
                 </div>
               </div>
-              <div className="nav-actions nav-actions--between">
-                <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
-                  戻る
-                </button>
-                <button type="button" className="btn btn-primary" onClick={() => goTo(2)}>
-                  詳細情報へ進む
-                </button>
-              </div>
             </>
           )}
 
@@ -176,11 +185,6 @@ export function App() {
             <>
               <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
               <ExportPanel onExport={book.exportBook} title={book.metadata.title} />
-              <div className="nav-actions nav-actions--start">
-                <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
-                  ページ編集へ戻る
-                </button>
-              </div>
             </>
           )}
         </div>
