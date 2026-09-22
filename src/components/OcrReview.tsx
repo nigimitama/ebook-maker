@@ -5,6 +5,7 @@ import type { PageEntry, RawImage } from '../types'
 import { buildPlainText, hasOcrText, ocrFileName } from '../lib/ocrText'
 import { OcrLineList } from './OcrLineList'
 import { OcrOverlay } from './OcrOverlay'
+import { OcrParagraphList } from './OcrParagraphList'
 import { ProgressBar } from './ProgressBar'
 
 export interface OcrReviewProps {
@@ -39,6 +40,7 @@ export function OcrReview({
   title,
 }: OcrReviewProps) {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'lines' | 'paragraphs'>('lines')
   const [addMode, setAddMode] = useState(false)
   const [overwrite, setOverwrite] = useState<null | { kind: 'one' | 'all'; pageId: string | null }>(null)
   const baseline = useRef<unknown>(undefined)
@@ -246,18 +248,42 @@ export function OcrReview({
 
         <div className="ocr-review__lines panel">
           {result ? (
-            <OcrLineList
-              lines={lines}
-              selectedLineId={selectedLineId}
-              onSelectLine={setSelectedLineId}
-              registerTextareaRef={(id, el) => {
-                if (el) textareas.current.set(id, el)
-                else textareas.current.delete(id)
-              }}
-              onCommit={(lineId, text) => void ocr.updateLine(page!.id, lineId, text)}
-              onDelete={(lineId) => void ocr.deleteLine(page!.id, lineId)}
-              onMove={(lineId, to) => void ocr.moveLine(page!.id, lineId, to)}
-            />
+            <>
+              <div className="ocr-review__view-toggle" role="group" aria-label="表示切り替え">
+                <button
+                  type="button"
+                  className={viewMode === 'lines' ? 'btn btn-primary' : 'btn btn-ghost'}
+                  aria-pressed={viewMode === 'lines'}
+                  onClick={() => setViewMode('lines')}
+                >
+                  行ごと
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === 'paragraphs' ? 'btn btn-primary' : 'btn btn-ghost'}
+                  aria-pressed={viewMode === 'paragraphs'}
+                  onClick={() => setViewMode('paragraphs')}
+                >
+                  段落プレビュー
+                </button>
+              </div>
+              {viewMode === 'lines' ? (
+                <OcrLineList
+                  lines={lines}
+                  selectedLineId={selectedLineId}
+                  onSelectLine={setSelectedLineId}
+                  registerTextareaRef={(id, el) => {
+                    if (el) textareas.current.set(id, el)
+                    else textareas.current.delete(id)
+                  }}
+                  onCommit={(lineId, text) => void ocr.updateLine(page!.id, lineId, text)}
+                  onDelete={(lineId) => void ocr.deleteLine(page!.id, lineId)}
+                  onMove={(lineId, to) => void ocr.moveLine(page!.id, lineId, to)}
+                />
+              ) : (
+                <OcrParagraphList lines={lines} />
+              )}
+            </>
           ) : (
             <p className="ocr-review__empty">このページはまだOCRされていません。</p>
           )}

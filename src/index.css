@@ -771,6 +771,19 @@ label {
   font: inherit;
 }
 
+.ocr-review__view-toggle {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.ocr-paragraphs__item {
+  padding: 8px 0;
+  border-bottom: 1px solid var(--color-divider);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .ocr-review__attribution {
   margin-top: 16px;
   font-size: 12px;

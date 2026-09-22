@@ -391,4 +391,31 @@ describe('OcrReview', () => {
       expect(revoke).toHaveBeenCalledWith('blob:txt')
     })
   })
+
+  it('「段落プレビュー」に切り替えると段落結合した文字列を表示し、「行ごと」に戻せる', () => {
+    const resultWithBlock: OcrResult = {
+      pageId: 'a',
+      modelVersion: 'v',
+      updatedAt: 1,
+      lines: [
+        { id: 'l1', x: 0, y: 0, w: 1, h: 1, text: '吾輩は猫である。名前はまだ', edited: false, blockId: 'b1' },
+        { id: 'l2', x: 0, y: 0, w: 1, h: 1, text: '無い。', edited: false, blockId: 'b1' },
+      ],
+    }
+    render(
+      <OcrReview
+        pages={pages}
+        thumbnails={thumbnails}
+        selectedPageId="a"
+        selectedImage={null}
+        onSelect={() => {}}
+        ocr={makeOcr({ results: { a: resultWithBlock } })}
+      />,
+    )
+    expect(screen.getByDisplayValue('吾輩は猫である。名前はまだ')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('段落プレビュー'))
+    expect(screen.getByText('吾輩は猫である。名前はまだ無い。')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('行ごと'))
+    expect(screen.getByDisplayValue('吾輩は猫である。名前はまだ')).toBeInTheDocument()
+  })
 })
