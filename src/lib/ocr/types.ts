@@ -15,6 +15,8 @@ export interface OcrLine extends Box {
   id: string
   text: string
   edited: boolean
+  /** 読み順推定で割り当てたブロック(段落)ID。手動追加した行やブロック未使用時はundefined。 */
+  blockId?: string
 }
 
 export interface OcrResult {

@@ -86,6 +86,8 @@ describe('runOcr', () => {
     expect(result.lines[0].x).toBeCloseTo(20, 5)
     expect(result.lines[0].w).toBeCloseTo(280, 5)
     expect(result.lines[1].y).toBeCloseTo(100 - 40 * 0.02, 5)
+    // ブロック検出が無い(rawにtext_blockを含めていない)ので、blockIdは付かない。
+    expect(result.lines.every((l) => l.blockId === undefined)).toBe(true)
   })
 
   it('char_count に応じた認識モデルと入力サイズを使う', async () => {
@@ -115,5 +117,28 @@ describe('runOcr', () => {
     const result = await runOcr(img, sessions, charset)
     expect(result.lines).toEqual([])
     expect(called).toBe(0)
+  })
+
+  it('text_blockに収まる行には同じblockIdを付ける', async () => {
+    // 上下2行(既存テストと同じ座標)を、それを覆うtext_block(原本座標で
+    // x:0..400, y:0..150 = raw値 0,0,800,300)に収める。
+    const rawWithBlock = {
+      boxes: new Float32Array([
+        20 * 2, 20 * 2, 300 * 2, 60 * 2, // 上の行(y=20..60)
+        20 * 2, 100 * 2, 300 * 2, 140 * 2, // 下の行(y=100..140)
+        0, 0, 800, 300, // text_block本体(label1 -> classId0、原本座標でy=0..150)
+      ]),
+      scores: new Float32Array([0.95, 0.9, 0.9]),
+      classIds: new BigInt64Array([2n, 2n, 1n]),
+      charCounts: new BigInt64Array([2n, 3n]),
+    }
+    const sessions: OcrSessions = {
+      detect: async () => rawWithBlock,
+      recognize: async () => ({ logits: logitsFor([0], vocab), seqLen: 1, vocab }),
+    }
+    const result = await runOcr(img, sessions, charset)
+    expect(result.lines).toHaveLength(2)
+    expect(result.lines[0].blockId).toBeDefined()
+    expect(result.lines[0].blockId).toBe(result.lines[1].blockId)
   })
 })
