@@ -132,11 +132,14 @@ export interface ZoomModalProps {
   label: string
   onClose: () => void
   children: ReactNode
+  /** 画像の右側に並べる追加パネル(目次の作成ステップのOCR結果表示などに使う)。 */
+  sidePanel?: ReactNode
 }
 
 // ページの拡大表示に使う共通モーダル。Escapeキー・オーバーレイクリック・
 // 閉じるボタンのいずれでも閉じる。中身(ZoomPane)は拡大縮小・ドラッグに対応する。
-export function ZoomModal({ label, onClose, children }: ZoomModalProps) {
+// sidePanelを渡すと、画像の右側に並べて表示する。
+export function ZoomModal({ label, onClose, children, sidePanel }: ZoomModalProps) {
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') onClose()
@@ -147,8 +150,16 @@ export function ZoomModal({ label, onClose, children }: ZoomModalProps) {
 
   return (
     <div className="thumb-modal" role="dialog" aria-modal="true" aria-label={label} onClick={onClose}>
-      <div className="thumb-modal__frame" onClick={(event) => event.stopPropagation()}>
-        <ZoomPane>{children}</ZoomPane>
+      <div
+        className={`thumb-modal__frame${sidePanel ? ' thumb-modal__frame--with-side-panel' : ''}`}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="thumb-modal__body">
+          <div className="thumb-modal__image-pane">
+            <ZoomPane>{children}</ZoomPane>
+          </div>
+          {sidePanel && <div className="thumb-modal__side-panel">{sidePanel}</div>}
+        </div>
         <button type="button" className="thumb-modal__close" onClick={onClose}>
           閉じる
         </button>

@@ -6,6 +6,32 @@ import { defaultBodyStartIndex, parseToc } from '../lib/toc/parseToc'
 import type { Chapter, PageEntry, RawImage } from '../types'
 import { AdjustedPreview, ZoomModal } from './ZoomModal'
 
+// 拡大表示モーダルの右側に出す、OCR結果の読み取り専用一覧。行の修正は
+// OCR確認・修正ステップの役割なので、ここでは表示だけ(編集はしない)。
+function TocOcrPanel({ result }: { result: OcrResult | undefined }) {
+  if (!result || result.lines.length === 0) {
+    return (
+      <div>
+        <p className="toc-ocr-panel__title">OCR結果</p>
+        <p>OCR未実施です。</p>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <p className="toc-ocr-panel__title">OCR結果</p>
+      <ul className="toc-ocr-panel__lines">
+        {result.lines.map((line) => (
+          <li key={line.id} className="toc-ocr-panel__line">
+            {line.text}
+            {line.edited && <span className="ocr-line__edited"> 修正済み</span>}
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export interface ChaptersStepProps {
   pages: PageEntry[]
   thumbnails: Record<string, string>
@@ -247,6 +273,7 @@ export function ChaptersStep({
         <ZoomModal
           label={zoomPage.fileName ?? `page ${zoomPage.order + 1}`}
           onClose={() => setZoomPageId(null)}
+          sidePanel={<TocOcrPanel result={ocrResults[zoomPage.id]} />}
         >
           {zoomImage ? (
             <AdjustedPreview image={zoomImage} adjustment={zoomPage.adjustment} />

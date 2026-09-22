@@ -169,4 +169,31 @@ describe('ChaptersStep', () => {
     fireEvent.keyDown(window, { key: 'Escape' })
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
+
+  it('shows the OCR result text next to the enlarged image', () => {
+    setup()
+    // p3のOCR結果は setup() の既定値(ocr('p3', ['本文'])) を使う。
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    expect(screen.getByText('本文')).toBeInTheDocument()
+  })
+
+  it('marks an edited OCR line in the side panel', () => {
+    const editedResult: OcrResult = {
+      pageId: 'p3',
+      modelVersion: 't',
+      updatedAt: 1,
+      lines: [{ id: 'p3-0', x: 0, y: 0, w: 1, h: 1, text: '直した行', edited: true }],
+    }
+    setup({ ocrResults: { p3: editedResult } })
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    expect(screen.getByText('直した行')).toBeInTheDocument()
+    expect(screen.getByText('修正済み')).toBeInTheDocument()
+  })
+
+  it('says OCR has not run yet when the enlarged page has no OCR result', () => {
+    setup()
+    // p4はsetup()の既定のocrResultsに含まれない。
+    fireEvent.click(screen.getByLabelText('4枚目を拡大表示'))
+    expect(screen.getByText('OCR未実施です。')).toBeInTheDocument()
+  })
 })
