@@ -13,6 +13,7 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     metadata: { title: '', author: '' },
     selectedPageId: null,
     selectedImage: null,
+    getPagePreview: vi.fn(),
     importFiles: vi.fn(),
     selectPage: vi.fn(),
     updateAdjustment: vi.fn(),

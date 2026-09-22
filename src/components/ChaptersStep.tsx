@@ -3,8 +3,8 @@ import type { OcrResult } from '../lib/ocr/types'
 import { newChapterId, sortChapters } from '../lib/toc/chapters'
 import { detectTocPages, tocScanWindow } from '../lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from '../lib/toc/parseToc'
-import type { Chapter, PageEntry } from '../types'
-import { ZoomModal } from './ZoomModal'
+import type { Chapter, PageEntry, RawImage } from '../types'
+import { AdjustedPreview, ZoomModal } from './ZoomModal'
 
 export interface ChaptersStepProps {
   pages: PageEntry[]
@@ -15,6 +15,8 @@ export interface ChaptersStepProps {
   onRunOcr: (pageIds: string[]) => void
   chapters: Chapter[]
   onChange: (chapters: Chapter[]) => void
+  /** 拡大表示用に、指定ページの原本から生成したプレビュー画素を取得する(サムネイルより高精細)。 */
+  getPagePreview: (pageId: string) => Promise<RawImage>
 }
 
 export function ChaptersStep({
@@ -25,6 +27,7 @@ export function ChaptersStep({
   onRunOcr,
   chapters,
   onChange,
+  getPagePreview,
 }: ChaptersStepProps) {
   const pageIds = useMemo(() => pages.map((p) => p.id), [pages])
   const [tocPageIds, setTocPageIds] = useState<string[]>([])
@@ -32,9 +35,28 @@ export function ChaptersStep({
   const [bodyStartEdited, setBodyStartEdited] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   // サムネイルは小さく読みにくいので、クリックで拡大表示するモーダルを出す
-  // (並べ替えページのZoomModalを流用。ここでは既に持っているサムネイル画像を
-  // そのまま拡大するだけで、原本の再デコードはしない)。
+  // (並べ替えページのZoomModal/AdjustedPreviewを流用)。サムネイルをそのまま
+  // 引き延ばすと荒くなるため、開いたタイミングで原本から高精細プレビューを取得する。
   const [zoomPageId, setZoomPageId] = useState<string | null>(null)
+  const [zoomImage, setZoomImage] = useState<RawImage | null>(null)
+  const [zoomError, setZoomError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setZoomImage(null)
+    setZoomError(null)
+    if (!zoomPageId) return
+    let cancelled = false
+    getPagePreview(zoomPageId)
+      .then((image) => {
+        if (!cancelled) setZoomImage(image)
+      })
+      .catch(() => {
+        if (!cancelled) setZoomError('画像の読み込みに失敗しました')
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [zoomPageId, getPagePreview])
 
   const windowSize = tocScanWindow(pages.length)
   const detection = useMemo(() => detectTocPages(pageIds, ocrResults), [pageIds, ocrResults])
@@ -221,12 +243,18 @@ export function ChaptersStep({
         </button>
       </div>
 
-      {zoomPage && thumbnails[zoomPage.id] && (
+      {zoomPage && (
         <ZoomModal
           label={zoomPage.fileName ?? `page ${zoomPage.order + 1}`}
           onClose={() => setZoomPageId(null)}
         >
-          <img src={thumbnails[zoomPage.id]} alt="" />
+          {zoomImage ? (
+            <AdjustedPreview image={zoomImage} adjustment={zoomPage.adjustment} />
+          ) : zoomError ? (
+            <p>{zoomError}</p>
+          ) : (
+            <div className="thumb-modal__loading">loading...</div>
+          )}
         </ZoomModal>
       )}
     </div>

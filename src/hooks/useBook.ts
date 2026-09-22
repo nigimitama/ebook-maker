@@ -21,6 +21,8 @@ export interface UseBookResult {
   metadata: BookMetadata
   selectedPageId: string | null
   selectedImage: RawImage | null
+  /** 任意のページのプレビュー画素を取得する(選択中ページとは独立。目次の作成ステップの拡大表示用)。 */
+  getPagePreview: (id: string) => Promise<RawImage>
   importFiles: (files: File[]) => Promise<void>
   selectPage: (id: string) => Promise<void>
   updateAdjustment: (id: string, adjustment: AdjustmentParams) => Promise<void>
@@ -293,6 +295,20 @@ export function useBook(): UseBookResult {
       return task
     },
     [],
+  )
+
+  // ウィザードの「選択中ページ」(selectedPageId/selectedImage)とは独立に、
+  // 任意のページのプレビュー画素を取得する(目次の作成ステップの拡大表示用)。
+  // loadPreviewのキャッシュを共有するので、選択中ページと重複しても二重デコードしない。
+  const getPagePreview = useCallback(
+    async (id: string): Promise<RawImage> => {
+      const store = await getStore()
+      if (!store) throw new Error('store not ready')
+      const preview = await loadPreview(id, store)
+      if (!preview) throw new Error(`page not found: ${id}`)
+      return preview
+    },
+    [getStore, loadPreview],
   )
 
   const showPreview = useCallback(
@@ -659,6 +675,7 @@ export function useBook(): UseBookResult {
     metadata,
     selectedPageId,
     selectedImage,
+    getPagePreview,
     importFiles,
     selectPage,
     updateAdjustment,

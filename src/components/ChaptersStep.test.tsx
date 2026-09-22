@@ -1,8 +1,12 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { ChaptersStep, type ChaptersStepProps } from './ChaptersStep'
 import type { OcrResult } from '../lib/ocr/types'
-import type { Chapter, PageEntry } from '../types'
+import type { Chapter, PageEntry, RawImage } from '../types'
+
+function rawImage(): RawImage {
+  return { data: new Uint8ClampedArray([1, 2, 3, 255]), width: 1, height: 1 }
+}
 
 function page(id: string, order: number): PageEntry {
   return {
@@ -46,6 +50,7 @@ function setup(overrides: Partial<ChaptersStepProps> = {}) {
     onRunOcr: vi.fn(),
     chapters: [],
     onChange: vi.fn(),
+    getPagePreview: vi.fn(async () => rawImage()),
     ...overrides,
   }
   render(<ChaptersStep {...props} />)
@@ -135,11 +140,20 @@ describe('ChaptersStep', () => {
     expect(screen.getByLabelText('本文1ページ目は画像何枚目か')).toHaveValue(7)
   })
 
-  it('opens an enlarged preview of a toc-page thumbnail without toggling its checkbox', () => {
-    setup()
+  it('opens an enlarged preview of a toc-page thumbnail without toggling its checkbox', async () => {
+    const props = setup()
     fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
     expect(screen.getByRole('dialog')).toBeInTheDocument()
     expect(screen.getByLabelText('3枚目を目次ページにする')).not.toBeChecked()
+    // サムネイルをそのまま引き延ばすのではなく、原本から生成した高精細プレビューを取得する。
+    expect(props.getPagePreview).toHaveBeenCalledWith('p3')
+    await waitFor(() => expect(screen.getByTestId('thumb-modal-canvas')).toBeInTheDocument())
+  })
+
+  it('shows an error message when the enlarged preview fails to load', async () => {
+    setup({ getPagePreview: vi.fn(async () => Promise.reject(new Error('boom'))) })
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    await waitFor(() => expect(screen.getByText('画像の読み込みに失敗しました')).toBeInTheDocument())
   })
 
   it('opens an enlarged preview of a chapter row thumbnail', () => {

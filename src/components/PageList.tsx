@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { applyAdjustment } from '../lib/applyAdjustment'
 import { DEFAULT_JPEG_QUALITY } from '../types'
 import type { AdjustmentParams, PageEntry, RawImage } from '../types'
-import { ZoomModal } from './ZoomModal'
+import { AdjustedPreview, ZoomModal } from './ZoomModal'
 
 // サムネイルは無加工の原本(thumbBlobId)なので、一覧でも調整の効果が一目で
 // わかるようフィルタで表示する。applyAdjustmentと同じ式
@@ -17,47 +16,6 @@ function adjustmentPreviewStyle(adjustment: AdjustmentParams): CSSProperties {
     `<svg xmlns='http://www.w3.org/2000/svg'><filter id='a' color-interpolation-filters='sRGB'>` +
     `<feComponentTransfer><feFuncR ${fn}/><feFuncG ${fn}/><feFuncB ${fn}/></feComponentTransfer></filter></svg>`
   return { filter: `url("data:image/svg+xml,${encodeURIComponent(svg)}#a")` }
-}
-
-interface AdjustedPreviewProps {
-  image: RawImage
-  adjustment: AdjustmentParams
-}
-
-// 拡大表示は原本の画素に実際の調整(明るさ・コントラスト・リサイズ)を
-// 適用した結果を見せる。書き出し結果に一番近いプレビューにするため。
-function AdjustedPreview({ image, adjustment }: AdjustedPreviewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const [ready, setReady] = useState(false)
-
-  // 画素演算は重いので、モーダルと「loading...」を先に描画してから遅延実行する。
-  useEffect(() => {
-    setReady(false)
-    const timer = setTimeout(() => {
-      const canvas = canvasRef.current
-      const ctx = canvas?.getContext('2d')
-      if (!canvas || !ctx) return
-      const preview = applyAdjustment(image, adjustment)
-      canvas.width = preview.width
-      canvas.height = preview.height
-      const imageData = new ImageData(new Uint8ClampedArray(preview.data), preview.width, preview.height)
-      ctx.putImageData(imageData, 0, 0)
-      setReady(true)
-    }, 0)
-    return () => clearTimeout(timer)
-  }, [image, adjustment])
-
-  return (
-    <>
-      {!ready && <div className="thumb-modal__loading">loading...</div>}
-      <canvas
-        ref={canvasRef}
-        data-testid="thumb-modal-canvas"
-        className="thumb-modal__canvas"
-        style={ready ? undefined : { display: 'none' }}
-      />
-    </>
-  )
 }
 
 function resizeLabel(adjustment: AdjustmentParams): string | null {

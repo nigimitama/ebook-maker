@@ -164,6 +164,21 @@ describe('useBook', () => {
     expect(view.result.current.error).toBeNull()
   })
 
+  it('getPagePreview decodes any page on demand, independent of the selected page', async () => {
+    const view = await importPages([
+      imageFile('a.png', [10, 20, 30, 255]),
+      imageFile('b.png', [40, 50, 60, 255]),
+    ])
+    const [first, second] = view.result.current.pages
+    // 選択中ページ(selectedPageId/selectedImage)は変えない。
+    const image = await view.result.current.getPagePreview(second.id)
+    expect(image.width).toBe(1)
+    expect(image.height).toBe(1)
+    expect(Array.from(image.data)).toEqual([40, 50, 60, 255])
+    expect(view.result.current.selectedPageId).not.toBe(second.id)
+    void first
+  })
+
   it('rebuilds thumbnails for pages restored from IndexedDB after a reload', async () => {
     const first = await importPages([
       imageFile('a.png', [10, 20, 30, 255]),

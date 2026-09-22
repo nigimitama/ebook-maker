@@ -268,6 +268,7 @@ export function App() {
               onRunOcr={(ids) => void ocr.runAll(ids, { skipDone: true })}
               chapters={chapters.chapters}
               onChange={(next) => chapters.setChapters(next).catch(() => {})}
+              getPagePreview={book.getPagePreview}
             />
           )}
 

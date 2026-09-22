@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
+import { applyAdjustment } from '../lib/applyAdjustment'
+import type { AdjustmentParams, RawImage } from '../types'
 
 const MIN_ZOOM = 0.5
 const MAX_ZOOM = 10
@@ -80,6 +82,47 @@ export function ZoomPane({ children }: { children: ReactNode }) {
           リセット
         </button>
       </div>
+    </>
+  )
+}
+
+export interface AdjustedPreviewProps {
+  image: RawImage
+  adjustment: AdjustmentParams
+}
+
+// 拡大表示は原本の画素に実際の調整(明るさ・コントラスト・リサイズ)を
+// 適用した結果を見せる。書き出し結果に一番近いプレビューにするため。
+export function AdjustedPreview({ image, adjustment }: AdjustedPreviewProps) {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const [ready, setReady] = useState(false)
+
+  // 画素演算は重いので、モーダルと「loading...」を先に描画してから遅延実行する。
+  useEffect(() => {
+    setReady(false)
+    const timer = setTimeout(() => {
+      const canvas = canvasRef.current
+      const ctx = canvas?.getContext('2d')
+      if (!canvas || !ctx) return
+      const preview = applyAdjustment(image, adjustment)
+      canvas.width = preview.width
+      canvas.height = preview.height
+      const imageData = new ImageData(new Uint8ClampedArray(preview.data), preview.width, preview.height)
+      ctx.putImageData(imageData, 0, 0)
+      setReady(true)
+    }, 0)
+    return () => clearTimeout(timer)
+  }, [image, adjustment])
+
+  return (
+    <>
+      {!ready && <div className="thumb-modal__loading">loading...</div>}
+      <canvas
+        ref={canvasRef}
+        data-testid="thumb-modal-canvas"
+        className="thumb-modal__canvas"
+        style={ready ? undefined : { display: 'none' }}
+      />
     </>
   )
 }
