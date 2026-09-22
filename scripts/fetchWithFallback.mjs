@@ -1,4 +1,5 @@
 import { verifyHash as defaultVerify } from './modelFiles.mjs'
+import { fetchWithTimeout } from './fetchTimeout.mjs'
 
 // sources を先頭から順に試し、取得でき、かつ SHA-256 が合った最初のものを返す。
 // 一次(先頭)が落ちていても、改ざん・更新でハッシュがずれていても次のソースへ回す。
@@ -9,7 +10,7 @@ export async function fetchVerified(sources, sha256, deps = {}) {
   const failures = []
   for (const url of sources) {
     try {
-      const res = await doFetch(url)
+      const res = await fetchWithTimeout(doFetch, url, {}, deps.timeoutMs)
       if (!res.ok) {
         failures.push(`${url}: HTTP ${res.status}`)
         continue

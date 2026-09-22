@@ -47,7 +47,9 @@ npm run lint       # oxlint
 
 ライセンスの解釈に関する注意: 公式リポジトリ全体は CC BY 4.0 ですが、ONNXモデルファイルが明示的に列挙されているわけではありません。判断の経緯は [モデル配布元の判断(ADR)](docs/superpowers/specs/2026-09-21-model-hosting-decision.md) を参照してください。
 
-モデルは `npm run fetch-models` で取得します(git管理外)。取得元を順に試し、各ファイルのSHA-256を検証します(DEIMv2は第2ソースとして ndlocrlite-web@50216cc も持ちます)。`npm run mirror-models` は将来のCloudflare R2ミラー用で、既定はdry-runです(実行には環境変数 `R2_BUCKET` が必要)。現時点ではまだ使っていません。
+モデルは `npm run fetch-models` で取得します(git管理外)。取得元を順に試し、各ファイルのSHA-256を検証します(DEIMv2は第2ソースとして ndlocrlite-web@50216cc も持ちます)。
+
+公式ソースが全滅したときの保険として、Cloudflare R2 の非公開バケット `ebook-maker` にモデル5本のミラーを配置済みです。CIに R2 の Secrets が設定されていれば `fetch-models` が自動でフォールバックし(S3互換APIへのSigV4署名リクエスト。`wrangler` はCIでは使いません)、ミラー経路でも同じSHA-256検証を通します。Secrets が無い環境(フォークなど)では公式ソースのみで動作します。ミラーへのアップロードは所有者がローカルで `R2_BUCKET=ebook-maker npm run mirror-models -- --execute`(既定はdry-run)を実行する運用で、こちらは `wrangler` を使います。取得元の生死は週次ワークフローで監視しており、公式ソースが落ちたらR2が代替できていても警報が鳴ります。詳細は [Cloudflare R2 運用手順](docs/ops/cloudflare-r2.md) を参照してください。
 
 ## OCR機能の使い方と注意
 
@@ -66,5 +68,5 @@ npm run lint       # oxlint
 
 ## 今後の課題
 
-- Cloudflare R2 バケット・APIトークン・GitHub Secrets の作成(オーナー作業、フェーズ3 Task 3)。
-- R2ミラーを `fetch-models` のフォールバックソースにする(Secrets がある場合のみ)、および取得元の死活確認を行う週次ワークフローの追加(フェーズ3 Task 4)。次のPRで対応予定です。
+- OCRのテキストをPDF/EPUBに埋め込む(現在は .txt での書き出しのみ)。
+- モデルのSHA-256を差し替えた際のR2ミラー再実行は手作業のままです(忘れるとフォールバックが404します。[運用手順](docs/ops/cloudflare-r2.md)参照)。
