@@ -269,6 +269,9 @@ export function App() {
               chapters={chapters.chapters}
               onChange={(next) => chapters.setChapters(next).catch(() => {})}
               getPagePreview={book.getPagePreview}
+              onUpdateOcrLine={(pageId, lineId, text) => void ocr.updateLine(pageId, lineId, text)}
+              onDeleteOcrLine={(pageId, lineId) => void ocr.deleteLine(pageId, lineId)}
+              onMoveOcrLine={(pageId, lineId, toIndex) => void ocr.moveLine(pageId, lineId, toIndex)}
             />
           )}
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ChaptersStep, type ChaptersStepProps } from './ChaptersStep'
 import type { OcrResult } from '../lib/ocr/types'
 import type { Chapter, PageEntry, RawImage } from '../types'
@@ -51,6 +51,9 @@ function setup(overrides: Partial<ChaptersStepProps> = {}) {
     chapters: [],
     onChange: vi.fn(),
     getPagePreview: vi.fn(async () => rawImage()),
+    onUpdateOcrLine: vi.fn(),
+    onDeleteOcrLine: vi.fn(),
+    onMoveOcrLine: vi.fn(),
     ...overrides,
   }
   render(<ChaptersStep {...props} />)
@@ -195,5 +198,28 @@ describe('ChaptersStep', () => {
     // p4はsetup()の既定のocrResultsに含まれない。
     fireEvent.click(screen.getByLabelText('4枚目を拡大表示'))
     expect(screen.getByText('OCR未実施です。')).toBeInTheDocument()
+  })
+
+  it('lets the user edit an OCR line text in the side panel and commits it on blur', () => {
+    const props = setup({
+      ocrResults: { p3: ocr('p3', ['一行目', '二行目']) },
+    })
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    const textarea = screen.getByLabelText('行1の文字')
+    fireEvent.change(textarea, { target: { value: '直した一行目' } })
+    fireEvent.blur(textarea)
+    expect(props.onUpdateOcrLine).toHaveBeenCalledWith('p3', 'p3-0', '直した一行目')
+  })
+
+  it('lets the user delete and reorder an OCR line from the side panel', () => {
+    const props = setup({
+      ocrResults: { p3: ocr('p3', ['一行目', '二行目']) },
+    })
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    const row = screen.getByTestId('ocr-line-p3-1')
+    fireEvent.click(within(row).getByRole('button', { name: '上へ移動' }))
+    expect(props.onMoveOcrLine).toHaveBeenCalledWith('p3', 'p3-1', 0)
+    fireEvent.click(within(row).getByRole('button', { name: '行を削除' }))
+    expect(props.onDeleteOcrLine).toHaveBeenCalledWith('p3', 'p3-1')
   })
 })

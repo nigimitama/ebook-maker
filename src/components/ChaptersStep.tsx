@@ -4,11 +4,20 @@ import { newChapterId, sortChapters } from '../lib/toc/chapters'
 import { detectTocPages, tocScanWindow } from '../lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from '../lib/toc/parseToc'
 import type { Chapter, PageEntry, RawImage } from '../types'
+import { OcrLineList } from './OcrLineList'
 import { AdjustedPreview, ZoomModal } from './ZoomModal'
 
-// 拡大表示モーダルの右側に出す、OCR結果の読み取り専用一覧。行の修正は
-// OCR確認・修正ステップの役割なので、ここでは表示だけ(編集はしない)。
-function TocOcrPanel({ result }: { result: OcrResult | undefined }) {
+export interface TocOcrPanelProps {
+  result: OcrResult | undefined
+  onUpdateLine: (lineId: string, text: string) => void
+  onDeleteLine: (lineId: string) => void
+  onMoveLine: (lineId: string, toIndex: number) => void
+}
+
+// 拡大表示モーダルの右側に出す、OCR結果の編集パネル。プレビュー画像を
+// 見ながらその場でテキストの修正・並べ替え・削除ができる(目次を解析する前の
+// 整形用途)。行の追加(枠選択)はOCR確認・修正ステップの役割なのでここでは扱わない。
+function TocOcrPanel({ result, onUpdateLine, onDeleteLine, onMoveLine }: TocOcrPanelProps) {
   if (!result || result.lines.length === 0) {
     return (
       <div>
@@ -20,14 +29,12 @@ function TocOcrPanel({ result }: { result: OcrResult | undefined }) {
   return (
     <div>
       <p className="toc-ocr-panel__title">OCR結果</p>
-      <ul className="toc-ocr-panel__lines">
-        {result.lines.map((line) => (
-          <li key={line.id} className="toc-ocr-panel__line">
-            {line.text}
-            {line.edited && <span className="ocr-line__edited"> 修正済み</span>}
-          </li>
-        ))}
-      </ul>
+      <OcrLineList
+        lines={result.lines}
+        onCommit={(lineId, text) => onUpdateLine(lineId, text)}
+        onDelete={(lineId) => onDeleteLine(lineId)}
+        onMove={(lineId, toIndex) => onMoveLine(lineId, toIndex)}
+      />
     </div>
   )
 }
@@ -43,6 +50,10 @@ export interface ChaptersStepProps {
   onChange: (chapters: Chapter[]) => void
   /** 拡大表示用に、指定ページの原本から生成したプレビュー画素を取得する(サムネイルより高精細)。 */
   getPagePreview: (pageId: string) => Promise<RawImage>
+  /** 拡大表示モーダル内でOCR結果を整形するための編集操作(OCR確認・修正ステップと共有)。 */
+  onUpdateOcrLine: (pageId: string, lineId: string, text: string) => void
+  onDeleteOcrLine: (pageId: string, lineId: string) => void
+  onMoveOcrLine: (pageId: string, lineId: string, toIndex: number) => void
 }
 
 export function ChaptersStep({
@@ -54,6 +65,9 @@ export function ChaptersStep({
   chapters,
   onChange,
   getPagePreview,
+  onUpdateOcrLine,
+  onDeleteOcrLine,
+  onMoveOcrLine,
 }: ChaptersStepProps) {
   const pageIds = useMemo(() => pages.map((p) => p.id), [pages])
   const [tocPageIds, setTocPageIds] = useState<string[]>([])
@@ -273,7 +287,14 @@ export function ChaptersStep({
         <ZoomModal
           label={zoomPage.fileName ?? `page ${zoomPage.order + 1}`}
           onClose={() => setZoomPageId(null)}
-          sidePanel={<TocOcrPanel result={ocrResults[zoomPage.id]} />}
+          sidePanel={
+            <TocOcrPanel
+              result={ocrResults[zoomPage.id]}
+              onUpdateLine={(lineId, text) => onUpdateOcrLine(zoomPage.id, lineId, text)}
+              onDeleteLine={(lineId) => onDeleteOcrLine(zoomPage.id, lineId)}
+              onMoveLine={(lineId, toIndex) => onMoveOcrLine(zoomPage.id, lineId, toIndex)}
+            />
+          }
         >
           {zoomImage ? (
             <AdjustedPreview image={zoomImage} adjustment={zoomPage.adjustment} />
