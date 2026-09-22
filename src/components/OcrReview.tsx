@@ -3,6 +3,7 @@ import type { UseOcrResult } from '../hooks/useOcr'
 import type { OcrResult } from '../lib/ocr/types'
 import type { PageEntry, RawImage } from '../types'
 import { buildPlainText, hasOcrText, ocrFileName } from '../lib/ocrText'
+import { buildParagraphs } from '../lib/paragraphs'
 import { OcrLineList } from './OcrLineList'
 import { OcrOverlay } from './OcrOverlay'
 import { OcrParagraphList } from './OcrParagraphList'
@@ -50,6 +51,11 @@ export function OcrReview({
   const result = page ? ocr.results[page.id] : undefined
   const lines = result?.lines ?? []
   const allIds = pages.map((p) => p.id)
+  // 段落プレビュー中は、画像に重ねる枠も行の枠ではなく段落(所属行の外接矩形)の枠にする。
+  const overlayLines =
+    viewMode === 'paragraphs'
+      ? buildParagraphs(lines).map((p) => ({ id: p.id, ...p.box, text: p.text, edited: false }))
+      : lines
 
   // ページを切り替えたら選択と各モードをリセットする。
   useEffect(() => {
@@ -141,7 +147,7 @@ export function OcrReview({
           type="button"
           className={addMode ? 'btn btn-ghost page-row__merge--active' : 'btn btn-ghost'}
           aria-pressed={addMode}
-          disabled={!result}
+          disabled={!result || viewMode === 'paragraphs'}
           onClick={() => setAddMode((v) => !v)}
         >
           枠を追加
@@ -232,7 +238,8 @@ export function OcrReview({
               image={selectedImage}
               originalWidth={page.width}
               originalHeight={page.height}
-              lines={lines}
+              lines={overlayLines}
+              variant={viewMode === 'paragraphs' ? 'paragraph' : 'line'}
               selectedLineId={selectedLineId}
               onSelectLine={selectLine}
               addMode={addMode}

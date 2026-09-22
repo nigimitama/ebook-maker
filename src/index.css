@@ -725,6 +725,12 @@ label {
   background: color-mix(in srgb, var(--color-accent) 30%, transparent);
 }
 
+.ocr-box--paragraph {
+  border: 2px dashed var(--color-accent-strong);
+  background: transparent;
+  cursor: default;
+}
+
 .ocr-box--draft {
   border: 1px dashed var(--color-accent-strong);
   pointer-events: none;

@@ -13,6 +13,12 @@ interface OcrOverlayProps {
   onSelectLine: (id: string) => void
   addMode: boolean
   onAddBox: (box: Box) => void
+  /**
+   * 'paragraph' で段落プレビュー用の枠(段落の外接矩形)を表示する。
+   * 見た目・ラベル・testidを行の枠と区別し、選択のハイライトはしない
+   * (段落プレビューは読み取り専用で、対応するテキストのフォーカス先が無いため)。
+   */
+  variant?: 'line' | 'paragraph'
 }
 
 // 画像(canvas)の上に、行の枠を原本px基準の割合(%)で重ねる。表示サイズに依らず
@@ -26,6 +32,7 @@ export function OcrOverlay({
   onSelectLine,
   addMode,
   onAddBox,
+  variant = 'line',
 }: OcrOverlayProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const areaRef = useRef<HTMLDivElement>(null)
@@ -118,24 +125,36 @@ export function OcrOverlay({
       onLostPointerCapture={cancelDrag}
     >
       <canvas ref={canvasRef} className="ocr-stage__canvas" aria-label="ページ画像" />
-      {lines.map((line, index) => (
-        <button
-          key={line.id}
-          type="button"
-          className={line.id === selectedLineId ? 'ocr-box ocr-box--selected' : 'ocr-box'}
-          data-testid={`ocr-box-${line.id}`}
-          aria-label={`行${index + 1}の枠`}
-          aria-current={line.id === selectedLineId ? 'true' : undefined}
-          style={{
-            left: pct(line.x, originalWidth),
-            top: pct(line.y, originalHeight),
-            width: pct(line.w, originalWidth),
-            height: pct(line.h, originalHeight),
-            pointerEvents: addMode ? 'none' : undefined,
-          }}
-          onClick={() => onSelectLine(line.id)}
-        />
-      ))}
+      {lines.map((line, index) => {
+        const isParagraph = variant === 'paragraph'
+        const selected = !isParagraph && line.id === selectedLineId
+        return (
+          <button
+            key={line.id}
+            type="button"
+            className={
+              [
+                'ocr-box',
+                isParagraph && 'ocr-box--paragraph',
+                selected && 'ocr-box--selected',
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            data-testid={isParagraph ? `ocr-box-${line.id}-paragraph` : `ocr-box-${line.id}`}
+            aria-label={`${isParagraph ? '段落' : '行'}${index + 1}の枠`}
+            aria-current={selected ? 'true' : undefined}
+            style={{
+              left: pct(line.x, originalWidth),
+              top: pct(line.y, originalHeight),
+              width: pct(line.w, originalWidth),
+              height: pct(line.h, originalHeight),
+              pointerEvents: addMode || isParagraph ? 'none' : undefined,
+            }}
+            onClick={() => onSelectLine(line.id)}
+          />
+        )
+      })}
       {draftStyle && <div className="ocr-box ocr-box--draft" style={draftStyle} />}
     </div>
   )

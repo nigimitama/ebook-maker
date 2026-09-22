@@ -413,9 +413,19 @@ describe('OcrReview', () => {
       />,
     )
     expect(screen.getByDisplayValue('吾輩は猫である。名前はまだ')).toBeInTheDocument()
+    // 行ごとでは行の数だけ枠が出る。
+    expect(screen.getByTestId('ocr-box-l1')).toBeInTheDocument()
+    expect(screen.getByTestId('ocr-box-l2')).toBeInTheDocument()
     fireEvent.click(screen.getByText('段落プレビュー'))
     expect(screen.getByText('吾輩は猫である。名前はまだ無い。')).toBeInTheDocument()
+    // 段落プレビューでは行の枠は消え、段落(先頭行のid)の枠が1つだけ出る。
+    expect(screen.queryByTestId('ocr-box-l1')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('ocr-box-l2')).not.toBeInTheDocument()
+    expect(screen.getByTestId('ocr-box-l1-paragraph')).toBeInTheDocument()
+    expect(screen.getByLabelText('段落1の枠')).toBeInTheDocument()
     fireEvent.click(screen.getByText('行ごと'))
     expect(screen.getByDisplayValue('吾輩は猫である。名前はまだ')).toBeInTheDocument()
+    expect(screen.getByTestId('ocr-box-l1')).toBeInTheDocument()
+    expect(screen.queryByTestId('ocr-box-l1-paragraph')).not.toBeInTheDocument()
   })
 })
