@@ -5,16 +5,16 @@ import { ImportPanel } from './components/ImportPanel'
 import { PageList } from './components/PageList'
 import { AdjustmentEditor } from './components/AdjustmentEditor'
 import { OcrReview } from './components/OcrReview'
-import { MetadataForm } from './components/MetadataForm'
 import { useChapters } from './hooks/useChapters'
 import { ChaptersStep } from './components/ChaptersStep'
+import { TitleStep } from './components/TitleStep'
 import { detectTocPages } from './lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from './lib/toc/parseToc'
 import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
-const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', '目次の作成', '詳細＆書き出し'] as const
+const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', 'タイトルの設定', '目次の作成', '詳細＆書き出し'] as const
 
 export function App() {
   const book = useBook()
@@ -154,7 +154,7 @@ export function App() {
                   OCRへ進む
                 </button>
                 {/* OCRは任意工程。使わない人がここで詰まらないよう、書き出しへ直行できる。 */}
-                <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(5)}>
                   OCRをスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(0)}>
@@ -165,10 +165,10 @@ export function App() {
             {step === 2 && (
               <>
                 <button type="button" className="btn btn-primary" onClick={() => goTo(3)}>
-                  目次の作成へ進む
+                  タイトルの設定へ進む
                 </button>
                 {/* 目次の作成も任意工程。既存の章立ては消さずに書き出しへ進む。 */}
-                <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(5)}>
                   目次の作成をスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
@@ -179,7 +179,7 @@ export function App() {
             {step === 3 && (
               <>
                 <button type="button" className="btn btn-primary" onClick={() => goTo(4)}>
-                  詳細情報へ進む
+                  目次の作成へ進む
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(2)}>
                   戻る
@@ -187,7 +187,17 @@ export function App() {
               </>
             )}
             {step === 4 && (
-              <button type="button" className="btn btn-ghost" onClick={() => goTo(3)}>
+              <>
+                <button type="button" className="btn btn-primary" onClick={() => goTo(5)}>
+                  詳細情報へ進む
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={() => goTo(3)}>
+                  戻る
+                </button>
+              </>
+            )}
+            {step === 5 && (
+              <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
                 目次の作成へ戻る
               </button>
             )}
@@ -260,6 +270,22 @@ export function App() {
           )}
 
           {step === 3 && (
+            <TitleStep
+              coverPage={book.pages[0]}
+              thumbnail={book.pages[0] ? book.thumbnails[book.pages[0].id] : undefined}
+              ocrResult={book.pages[0] ? ocr.results[book.pages[0].id] : undefined}
+              ocrRunning={ocr.running}
+              onRunOcr={() => {
+                const cover = book.pages[0]
+                if (cover) void ocr.runOne(cover.id)
+              }}
+              metadata={book.metadata}
+              onChange={book.setMetadata}
+              getPagePreview={book.getPagePreview}
+            />
+          )}
+
+          {step === 4 && (
             <ChaptersStep
               pages={book.pages}
               thumbnails={book.thumbnails}
@@ -275,15 +301,12 @@ export function App() {
             />
           )}
 
-          {step === 4 && (
-            <>
-              <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
-              <ExportPanel
-                onExport={book.exportBook}
-                title={book.metadata.title}
-                chapterCount={chapters.chapters.length}
-              />
-            </>
+          {step === 5 && (
+            <ExportPanel
+              onExport={book.exportBook}
+              title={book.metadata.title}
+              chapterCount={chapters.chapters.length}
+            />
           )}
         </div>
       </div>
