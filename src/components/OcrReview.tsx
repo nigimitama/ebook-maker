@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import type { UseOcrResult } from '../hooks/useOcr'
-import type { OcrLine, OcrResult } from '../lib/ocr/types'
+import type { OcrResult } from '../lib/ocr/types'
 import type { PageEntry, RawImage } from '../types'
 import { buildPlainText, hasOcrText, ocrFileName } from '../lib/ocrText'
+import { OcrLineList } from './OcrLineList'
 import { OcrOverlay } from './OcrOverlay'
 import { ProgressBar } from './ProgressBar'
 
@@ -26,90 +27,6 @@ function statusOf(result: OcrResult | undefined): '未' | '済' | '修正あり'
 const STAGE_LABEL: Record<string, string> = {
   detecting: '文字の領域を検出中',
   recognizing: '文字を認識中',
-}
-
-interface LineRowProps {
-  line: OcrLine
-  index: number
-  count: number
-  selected: boolean
-  registerRef: (el: HTMLTextAreaElement | null) => void
-  onFocus: () => void
-  onCommit: (text: string) => void
-  onDelete: () => void
-  onMove: (toIndex: number) => void
-}
-
-function LineRow({
-  line,
-  index,
-  count,
-  selected,
-  registerRef,
-  onFocus,
-  onCommit,
-  onDelete,
-  onMove,
-}: LineRowProps) {
-  const [draft, setDraft] = useState(line.text)
-  // 入力中(未保存)の下書きは、外からのテキスト更新で上書きしない。
-  const dirty = useRef(false)
-  useEffect(() => {
-    if (!dirty.current) setDraft(line.text)
-  }, [line.text])
-  const label = `行${index + 1}`
-  return (
-    <li
-      className={selected ? 'ocr-line ocr-line--selected' : 'ocr-line'}
-      data-testid={`ocr-line-${line.id}`}
-      aria-current={selected ? 'true' : undefined}
-    >
-      <div className="ocr-line__head">
-        <span className="ocr-line__no">{index + 1}</span>
-        {line.edited && <span className="ocr-line__edited">修正済み</span>}
-        <span className="ocr-line__actions">
-          <button
-            type="button"
-            className="btn-ghost"
-            aria-label="上へ移動"
-            disabled={index === 0}
-            onClick={() => onMove(index - 1)}
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            className="btn-ghost"
-            aria-label="下へ移動"
-            disabled={index === count - 1}
-            onClick={() => onMove(index + 1)}
-          >
-            ↓
-          </button>
-          <button type="button" className="btn-ghost" aria-label="行を削除" onClick={onDelete}>
-            削除
-          </button>
-        </span>
-      </div>
-      <textarea
-        ref={registerRef}
-        className="ocr-line__text"
-        aria-label={`${label}の文字`}
-        rows={2}
-        value={draft}
-        onFocus={onFocus}
-        onChange={(event) => {
-          dirty.current = true
-          setDraft(event.target.value)
-        }}
-        onBlur={() => {
-          if (!dirty.current) return
-          dirty.current = false
-          if (draft !== line.text) onCommit(draft)
-        }}
-      />
-    </li>
-  )
 }
 
 export function OcrReview({
@@ -329,25 +246,18 @@ export function OcrReview({
 
         <div className="ocr-review__lines panel">
           {result ? (
-            <ol className="ocr-lines">
-              {lines.map((line, index) => (
-                <LineRow
-                  key={line.id}
-                  line={line}
-                  index={index}
-                  count={lines.length}
-                  selected={line.id === selectedLineId}
-                  registerRef={(el) => {
-                    if (el) textareas.current.set(line.id, el)
-                    else textareas.current.delete(line.id)
-                  }}
-                  onFocus={() => setSelectedLineId(line.id)}
-                  onCommit={(text) => void ocr.updateLine(page!.id, line.id, text)}
-                  onDelete={() => void ocr.deleteLine(page!.id, line.id)}
-                  onMove={(to) => void ocr.moveLine(page!.id, line.id, to)}
-                />
-              ))}
-            </ol>
+            <OcrLineList
+              lines={lines}
+              selectedLineId={selectedLineId}
+              onSelectLine={setSelectedLineId}
+              registerTextareaRef={(id, el) => {
+                if (el) textareas.current.set(id, el)
+                else textareas.current.delete(id)
+              }}
+              onCommit={(lineId, text) => void ocr.updateLine(page!.id, lineId, text)}
+              onDelete={(lineId) => void ocr.deleteLine(page!.id, lineId)}
+              onMove={(lineId, to) => void ocr.moveLine(page!.id, lineId, to)}
+            />
           ) : (
             <p className="ocr-review__empty">このページはまだOCRされていません。</p>
           )}

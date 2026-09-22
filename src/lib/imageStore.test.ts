@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { ImageStore } from './imageStore'
 import { Blob as NodeBlob } from 'node:buffer'
 import type { OcrResult } from './ocr/types'
+import type { Chapter } from '../types'
 
 function blob(byte: number): Blob {
   return new NodeBlob([new Uint8Array([byte])], { type: 'image/png' }) as unknown as Blob
@@ -189,6 +190,31 @@ describe('ImageStore', () => {
   })
 })
 
+it('stores chapters as one ordered list and returns [] when none are saved', async () => {
+  const store = await ImageStore.open(`ch-db-${Math.random()}`)
+  expect(await store.listChapters()).toEqual([])
+  const chapters: Chapter[] = [
+    { id: 'c1', title: '第1章', pageId: 'p1', level: 1 },
+    { id: 'c2', title: '1.1', pageId: 'p1', level: 2 },
+  ]
+  await store.putChapters(chapters)
+  expect(await store.listChapters()).toEqual(chapters)
+  await store.putChapters([chapters[1]])
+  expect(await store.listChapters()).toEqual([chapters[1]])
+  store.close()
+})
+
+it('clearAll removes chapters and restorePages brings them back', async () => {
+  const store = await ImageStore.open(`ch-db-${Math.random()}`)
+  const chapters: Chapter[] = [{ id: 'c1', title: '第1章', pageId: 'p1', level: 1 }]
+  await store.putChapters(chapters)
+  await store.clearAll()
+  expect(await store.listChapters()).toEqual([])
+  await store.restorePages([], [], [], chapters)
+  expect(await store.listChapters()).toEqual(chapters)
+  store.close()
+})
+
 describe('ImageStore open blocking', () => {
   it('他の接続が古いバージョンを保持していると、ハングせず案内付きで reject する', async () => {
     const name = `blocked-db-${Math.random()}`
@@ -213,7 +239,7 @@ describe('ImageStore open blocking', () => {
     const store = await ImageStore.open(name)
     const ok = await Promise.race([
       new Promise<boolean>((resolve, reject) => {
-        const r = indexedDB.open(name, 3)
+        const r = indexedDB.open(name, 4)
         r.onsuccess = () => {
           r.result.close()
           resolve(true)

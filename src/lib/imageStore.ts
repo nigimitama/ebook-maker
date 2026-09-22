@@ -1,14 +1,17 @@
-import type { AdjustmentParams, PageEntry } from '../types'
+import type { AdjustmentParams, Chapter, PageEntry } from '../types'
 import { DEFAULT_ADJUSTMENT } from '../types'
 import type { OcrResult } from './ocr/types'
 
 const BLOB_STORE = 'blobs'
 const PAGE_STORE = 'pages'
 const OCR_STORE = 'ocr'
+const CHAPTER_STORE = 'chapters'
+// 章は配列順が意味を持つ(同一ページ内の順序)ので、1レコードに配列ごと入れる。
+const CHAPTER_KEY = 'all'
 
 function openDb(name: string): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(name, 2)
+    const req = indexedDB.open(name, 3)
     let settled = false
     req.onupgradeneeded = () => {
       const db = req.result
@@ -20,6 +23,9 @@ function openDb(name: string): Promise<IDBDatabase> {
       }
       if (!db.objectStoreNames.contains(OCR_STORE)) {
         db.createObjectStore(OCR_STORE, { keyPath: 'pageId' })
+      }
+      if (!db.objectStoreNames.contains(CHAPTER_STORE)) {
+        db.createObjectStore(CHAPTER_STORE)
       }
     }
     req.onblocked = () => {
@@ -184,6 +190,18 @@ export class ImageStore {
     await txDone(tx)
   }
 
+  async listChapters(): Promise<Chapter[]> {
+    const tx = this.db.transaction(CHAPTER_STORE, 'readonly')
+    const stored = await reqToPromise(tx.objectStore(CHAPTER_STORE).get(CHAPTER_KEY))
+    return (stored as Chapter[] | undefined) ?? []
+  }
+
+  async putChapters(chapters: Chapter[]): Promise<void> {
+    const tx = this.db.transaction(CHAPTER_STORE, 'readwrite')
+    tx.objectStore(CHAPTER_STORE).put(chapters, CHAPTER_KEY)
+    await txDone(tx)
+  }
+
   async deletePage(id: string): Promise<void> {
     const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
     const pageStore = tx.objectStore(PAGE_STORE)
@@ -198,9 +216,10 @@ export class ImageStore {
   }
 
   async clearAll(): Promise<void> {
-    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE, CHAPTER_STORE], 'readwrite')
     tx.objectStore(PAGE_STORE).clear()
     tx.objectStore(OCR_STORE).clear()
+    tx.objectStore(CHAPTER_STORE).clear()
     tx.objectStore(BLOB_STORE).clear()
     await txDone(tx)
   }
@@ -210,10 +229,12 @@ export class ImageStore {
     pages: PageEntry[],
     blobs: [string, Blob][],
     ocr: OcrResult[] = [],
+    chapters: Chapter[] = [],
   ): Promise<void> {
-    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE], 'readwrite')
+    const tx = this.db.transaction([BLOB_STORE, PAGE_STORE, OCR_STORE, CHAPTER_STORE], 'readwrite')
     const ocrStore = tx.objectStore(OCR_STORE)
     for (const result of ocr) ocrStore.put(result)
+    if (chapters.length > 0) tx.objectStore(CHAPTER_STORE).put(chapters, CHAPTER_KEY)
     const blobStore = tx.objectStore(BLOB_STORE)
     for (const [id, blob] of blobs) blobStore.put(blob, id)
     const pageStore = tx.objectStore(PAGE_STORE)

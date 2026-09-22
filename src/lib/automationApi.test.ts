@@ -13,8 +13,13 @@ function fakeApi(overrides: Partial<Omit<AutomationApi, 'describe'>> = {}): Omit
       importProgress: null,
       canUndoClearAll: false,
       ocr: { running: false, progress: null },
+      chapters: [],
     })),
     goToStep: vi.fn(),
+    getChapters: () => [],
+    setChapters: async () => {},
+    detectTocPages: () => ({ pageIds: [], unscannedPageIds: [] }),
+    parseToc: () => [],
     runOcr: vi.fn(),
     runOcrAll: vi.fn(),
     getOcr: vi.fn(),
@@ -70,9 +75,18 @@ describe('installAutomationApi', () => {
 
     const methods = window.EbookMaker!.describe().methods
     expect(methods.goToStep).toContain('2:OCR確認・修正')
-    expect(methods.goToStep).toContain('3:詳細＆書き出し')
+    expect(methods.goToStep).toContain('3:目次の作成')
+    expect(methods.goToStep).toContain('4:詳細＆書き出し')
     for (const name of ['runOcr', 'runOcrAll', 'getOcr', 'setOcrLineText'] as const) {
       expect(methods[name]).toBeTruthy()
+    }
+  })
+
+  it('describes the chapter methods', () => {
+    installAutomationApi(fakeApi())
+    const methods = window.EbookMaker!.describe().methods
+    for (const name of ['getChapters', 'setChapters', 'detectTocPages', 'parseToc']) {
+      expect(methods).toHaveProperty(name)
     }
   })
 })

@@ -5,15 +5,22 @@ type Format = 'pdf' | 'epub'
 type Status = 'idle' | 'running' | 'done' | 'error'
 
 interface ExportPanelProps {
-  onExport: (format: Format, onProgress?: (done: number, total: number) => void) => Promise<Blob>
+  onExport: (
+    format: Format,
+    onProgress?: (done: number, total: number) => void,
+    options?: { embedChapters: boolean },
+  ) => Promise<Blob>
   title?: string
+  // 目次が1件以上あるときだけ「しおり・目次を埋め込む」を出す。
+  chapterCount?: number
 }
 
 function sanitizeFileName(name: string): string {
   return name.trim().replace(/[\\/:*?"<>|]/g, '_')
 }
 
-export function ExportPanel({ onExport, title }: ExportPanelProps) {
+export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelProps) {
+  const [embedChapters, setEmbedChapters] = useState(true)
   const [format, setFormat] = useState<Format>('pdf')
   const [status, setStatus] = useState<Status>('idle')
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
@@ -25,7 +32,9 @@ export function ExportPanel({ onExport, title }: ExportPanelProps) {
     setErrorMessage(null)
     setProgress(null)
     try {
-      const blob = await onExport(format, (done, total) => setProgress({ done, total }))
+      const blob = await onExport(format, (done, total) => setProgress({ done, total }), {
+        embedChapters,
+      })
       setDownloadUrl(URL.createObjectURL(blob))
       setStatus('done')
     } catch (error) {
@@ -60,6 +69,16 @@ export function ExportPanel({ onExport, title }: ExportPanelProps) {
         EPUB
       </label>
       </div>
+      {chapterCount > 0 && (
+        <label>
+          <input
+            type="checkbox"
+            checked={embedChapters}
+            onChange={(event) => setEmbedChapters(event.target.checked)}
+          />
+          しおり・目次を埋め込む
+        </label>
+      )}
       <button type="button" onClick={handleExport} disabled={status === 'running'}>
         書き出し
       </button>

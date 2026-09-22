@@ -164,6 +164,21 @@ describe('useBook', () => {
     expect(view.result.current.error).toBeNull()
   })
 
+  it('getPagePreview decodes any page on demand, independent of the selected page', async () => {
+    const view = await importPages([
+      imageFile('a.png', [10, 20, 30, 255]),
+      imageFile('b.png', [40, 50, 60, 255]),
+    ])
+    const [first, second] = view.result.current.pages
+    // 選択中ページ(selectedPageId/selectedImage)は変えない。
+    const image = await view.result.current.getPagePreview(second.id)
+    expect(image.width).toBe(1)
+    expect(image.height).toBe(1)
+    expect(Array.from(image.data)).toEqual([40, 50, 60, 255])
+    expect(view.result.current.selectedPageId).not.toBe(second.id)
+    void first
+  })
+
   it('rebuilds thumbnails for pages restored from IndexedDB after a reload', async () => {
     const first = await importPages([
       imageFile('a.png', [10, 20, 30, 255]),
@@ -202,6 +217,22 @@ describe('useBook', () => {
       await view.result.current.undoClearAll()
     })
     expect(await store!.listOcr()).toEqual([ocr])
+  })
+
+  it('restores chapters when undoing clear-all', async () => {
+    const view = await importPages([imageFile('a.png', [1, 2, 3, 255])])
+    const [page] = view.result.current.pages
+    const store = await view.result.current.getStore()
+    const chapters = [{ id: 'c1', title: '第1章', pageId: page.id, level: 1 }]
+    await store!.putChapters(chapters)
+    await act(async () => {
+      await view.result.current.clearAllPages()
+    })
+    expect(await store!.listChapters()).toEqual([])
+    await act(async () => {
+      await view.result.current.undoClearAll()
+    })
+    expect(await store!.listChapters()).toEqual(chapters)
   })
 
   it('bakes each page’s adjustment into the pixels when merging a spread', async () => {
@@ -305,5 +336,30 @@ describe('useBook', () => {
       width: 1,
       height: 1,
     })
+  })
+
+  it('passes chapters converted to page indexes to the export worker, unless embedding is off', async () => {
+    const view = await importPages([
+      imageFile('a.png', [1, 2, 3, 255]),
+      imageFile('b.png', [4, 5, 6, 255]),
+    ])
+    const [, second] = view.result.current.pages
+    const store = await view.result.current.getStore()
+    await store!.putChapters([
+      { id: 'c1', title: '第1章', pageId: second.id, level: 1 },
+      { id: 'c2', title: '消えたページ', pageId: 'gone', level: 1 },
+    ])
+    vi.mocked(runExportInWorker).mockClear()
+    await act(async () => {
+      await view.result.current.exportBook('pdf')
+    })
+    expect(vi.mocked(runExportInWorker).mock.calls[0][0].chapters).toEqual([
+      { title: '第1章', pageIndex: 1, level: 1 },
+    ])
+    vi.mocked(runExportInWorker).mockClear()
+    await act(async () => {
+      await view.result.current.exportBook('pdf', undefined, { embedChapters: false })
+    })
+    expect(vi.mocked(runExportInWorker).mock.calls[0][0].chapters).toEqual([])
   })
 })

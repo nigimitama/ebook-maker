@@ -1,5 +1,6 @@
 import JSZip from 'jszip'
-import type { BookMetadata } from '../types'
+import type { BookMetadata, ExportChapter } from '../types'
+import { buildOutlineTree, type OutlineNode } from './toc/chapters'
 import type { ExportPage } from './pdfExport'
 
 const CONTAINER_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -48,14 +49,29 @@ function pageXhtml(n: number, width: number, height: number): string {
 `
 }
 
-function navXhtml(): string {
+function navItems(nodes: OutlineNode[], indent: string): string {
+  return nodes
+    .map((node) => {
+      const link = `<a href="text/page-${node.chapter.pageIndex + 1}.xhtml">${escapeXml(node.chapter.title)}</a>`
+      if (node.children.length === 0) return `${indent}<li>${link}</li>`
+      return `${indent}<li>${link}\n${indent}  <ol>\n${navItems(node.children, `${indent}    `)}\n${indent}  </ol>\n${indent}</li>`
+    })
+    .join('\n')
+}
+
+function navXhtml(chapters: ExportChapter[], pageCount: number): string {
+  const valid = chapters.filter((c) => c.pageIndex >= 0 && c.pageIndex < pageCount)
+  const items =
+    valid.length > 0
+      ? navItems(buildOutlineTree(valid), '      ')
+      : '      <li><a href="text/page-1.xhtml">Start</a></li>'
   return `<?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
 <head><title>Navigation</title></head>
 <body>
   <nav epub:type="toc">
     <ol>
-      <li><a href="text/page-1.xhtml">Start</a></li>
+${items}
     </ol>
   </nav>
 </body>
@@ -72,7 +88,11 @@ function folder(zip: JSZip, name: string): JSZip {
   return created
 }
 
-export async function buildEpub(pages: ExportPage[], metadata: BookMetadata): Promise<Uint8Array> {
+export async function buildEpub(
+  pages: ExportPage[],
+  metadata: BookMetadata,
+  chapters: ExportChapter[] = [],
+): Promise<Uint8Array> {
   const zip = new JSZip()
   zip.file('mimetype', 'application/epub+zip', { compression: 'STORE' })
   folder(zip, 'META-INF').file('container.xml', CONTAINER_XML)
@@ -97,7 +117,7 @@ export async function buildEpub(pages: ExportPage[], metadata: BookMetadata): Pr
     spineItems.push(`<itemref idref="page${n}"/>`)
   })
 
-  oebps.file('nav.xhtml', navXhtml())
+  oebps.file('nav.xhtml', navXhtml(chapters, pages.length))
 
   const opf = `<?xml version="1.0" encoding="UTF-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="bookid">

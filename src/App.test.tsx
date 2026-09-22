@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { act, render, screen, fireEvent } from '@testing-library/react'
 import { App } from './App'
 import * as useBookModule from './hooks/useBook'
+import * as useChaptersModule from './hooks/useChapters'
 import type { UseBookResult } from './hooks/useBook'
 
 function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
@@ -12,6 +13,7 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     metadata: { title: '', author: '' },
     selectedPageId: null,
     selectedImage: null,
+    getPagePreview: vi.fn(),
     importFiles: vi.fn(),
     selectPage: vi.fn(),
     updateAdjustment: vi.fn(),
@@ -61,10 +63,10 @@ describe('App', () => {
     expect(screen.getByText('見開き結合')).toBeInTheDocument()
   })
 
-  it('shows the four steps of the flow', () => {
+  it('shows the five steps of the flow', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
     render(<App />)
-    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '詳細＆書き出し']) {
+    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '目次の作成', '詳細＆書き出し']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -79,15 +81,30 @@ describe('App', () => {
     expect(screen.getByText('このページをOCR')).toBeInTheDocument()
   })
 
-  it('advances from the OCR確認・修正 step to 詳細＆書き出し', () => {
+  it('advances from the OCR確認・修正 step to the 目次の作成 step, then to 詳細＆書き出し', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('目次の作成へ進む'))
+    expect(screen.getByText('章を追加')).toBeInTheDocument()
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
+  })
+
+  // 目次の作成も任意工程。OCR確認から直接書き出しへ進める。
+  it('lets the user skip the 目次の作成 step', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('目次の作成をスキップして書き出しへ'))
+    expect(screen.getByText('書き出し')).toBeInTheDocument()
+    expect(screen.queryByText('章を追加')).not.toBeInTheDocument()
   })
 
   // OCRは任意工程。飛ばしても書き出しに進める。
@@ -102,16 +119,17 @@ describe('App', () => {
     expect(screen.queryByText('このページをOCR')).not.toBeInTheDocument()
   })
 
-  it('returns from the 書き出し step to the OCR確認・修正 step', () => {
+  it('returns from the 書き出し step to the 目次の作成 step', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('目次の作成へ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
-    fireEvent.click(screen.getByText('OCR確認へ戻る'))
-    expect(screen.getByText('このページをOCR')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('目次の作成へ戻る'))
+    expect(screen.getByText('章を追加')).toBeInTheDocument()
   })
 
   it('shows the AdjustmentEditor on the 並べ替え・調整 step once a page is selected and its image is loaded', () => {
@@ -173,6 +191,27 @@ describe('App', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument()
   })
 
+  it('shows the chapter save error in the banner and clears it with 閉じる', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
+    const clearError = vi.fn()
+    vi.spyOn(useChaptersModule, 'useChapters').mockReturnValue({
+      chapters: [],
+      setChapters: vi.fn(),
+      error: '目次の保存に失敗しました: x',
+      clearError,
+    })
+    render(<App />)
+    expect(screen.getByTestId('error-banner')).toHaveTextContent('目次の保存に失敗しました: x')
+    fireEvent.click(screen.getByText('閉じる'))
+    expect(clearError).toHaveBeenCalled()
+  })
+
+  it('parseToc throws for an unknown bodyStartPageId', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
+    render(<App />)
+    expect(() => window.EbookMaker?.parseToc([], 'no-such-id')).toThrow('no-such-id')
+  })
+
   it('does not allow jumping to a step ahead of the furthest one reached via the rail', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
@@ -196,6 +235,8 @@ describe('App', () => {
       { id: 'a', order: 0, fileName: undefined, width: 10, height: 10, adjustment: page.adjustment },
     ])
     expect(state?.selectedPageId).toBe('a')
+    expect(state?.chapters).toEqual([])
+    expect(window.EbookMaker?.getChapters()).toEqual([])
 
     act(() => window.EbookMaker?.goToStep(1))
     expect(screen.getByText('見開き結合')).toBeInTheDocument()

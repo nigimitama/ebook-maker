@@ -23,3 +23,18 @@ DOM操作の代わりにこのAPIを直接呼び出すことで、画像の読�
 このAPIはページを開いた各ブラウザセッション内でのみ有効。データは
 そのブラウザのIndexedDBにローカル保存されるため、別セッション(別プロファイル
 やクリーンな自動化用ブラウザ)からは既存データは見えない。
+
+## 目次の作成(しおり・目次)
+
+OCR済みのページから目次を読み取り、目次として書き出しに埋め込める。
+`window.EbookMaker` の次のメソッドを使う。
+
+1. `runOcrAll()` などで目次ページをOCRしておく。
+2. `detectTocPages()` で目次ページを自動検出する(先頭の一部のページが対象)。
+3. `parseToc(tocPageIds, bodyStartPageId?)` で章の候補を得る。`bodyStartPageId` は
+   印刷ページ1ページ目に当たるページ(省略時は目次の最後の次。存在しないIDはエラーになる)。候補は保存されない。
+4. 内容を確認・修正して `setChapters(chapters)` で保存する。
+5. `exportBook('pdf' | 'epub')` で、章があればPDFのしおり・EPUBの目次に埋め込まれる。
+   章を付けたくなければ `setChapters([])`。
+
+章は `{ id, title, pageId, level }`。levelは1(章)か2(節)の2階層まで。

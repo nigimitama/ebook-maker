@@ -40,6 +40,22 @@ export interface BookMetadata {
   author: string
 }
 
+// 章立て(目次)の1項目。開始ページは、並べ替え・削除に追従できるよう番号ではなくIDで持つ。
+// level は 1=章, 2=節(2階層まで)。同一ページに複数の章があってよく、その順序は配列順。
+export interface Chapter {
+  id: string
+  title: string
+  pageId: string
+  level: number
+}
+
+// 書き出し用に、章を書き出し順のページindex(0始まり)へ変換したもの。
+export interface ExportChapter {
+  title: string
+  pageIndex: number
+  level: number
+}
+
 // DOMの ImageData ({data, width, height}) と構造的に互換だが、画像処理の
 // 純関数をブラウザ/canvasなしでユニットテストできるよう独自に定義している。
 // jsdomは ImageData を実装していない(jsdom 30で確認: `new window.ImageData(...)`

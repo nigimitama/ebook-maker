@@ -54,4 +54,32 @@ describe('buildEpub', () => {
     const opf = await zip.file('OEBPS/content.opf')!.async('string')
     expect(opf).toContain('A &amp; B &lt;Title&gt;')
   })
+
+  it('builds a nested toc in nav.xhtml from chapters', async () => {
+    const jpeg = decodeBase64Jpeg()
+    const pages = [0, 1, 2].map(() => ({ jpeg, width: 2, height: 1 }))
+    const bytes = await buildEpub(pages, { title: 't', author: 'a' }, [
+      { title: '第1章 <はじめに>', pageIndex: 0, level: 1 },
+      { title: '1.1 背景', pageIndex: 1, level: 2 },
+      { title: '第2章', pageIndex: 2, level: 1 },
+      { title: '範囲外', pageIndex: 9, level: 1 },
+    ])
+    const zip = await JSZip.loadAsync(bytes)
+    const nav = await zip.file('OEBPS/nav.xhtml')!.async('string')
+    expect(nav).toContain('<a href="text/page-1.xhtml">第1章 &lt;はじめに&gt;</a>')
+    expect(nav).toContain('<a href="text/page-2.xhtml">1.1 背景</a>')
+    expect(nav).toContain('<a href="text/page-3.xhtml">第2章</a>')
+    expect(nav).not.toContain('範囲外')
+    expect(nav).not.toContain('>Start<')
+    // 節は章の <li> の中の入れ子の <ol> に入る。
+    expect(nav).toMatch(/第1章[\s\S]*<ol>[\s\S]*1\.1 背景[\s\S]*<\/ol>[\s\S]*第2章/)
+  })
+
+  it('keeps the plain nav when there are no chapters', async () => {
+    const jpeg = decodeBase64Jpeg()
+    const bytes = await buildEpub([{ jpeg, width: 2, height: 1 }], { title: 't', author: 'a' })
+    const zip = await JSZip.loadAsync(bytes)
+    const nav = await zip.file('OEBPS/nav.xhtml')!.async('string')
+    expect(nav).toContain('>Start<')
+  })
 })

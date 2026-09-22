@@ -7,10 +7,11 @@ import { encodeRawImageToPng } from '../lib/encodeImage'
 import { computeAutoAdjustment } from '../lib/autoAdjust'
 import { applyAdjustment } from '../lib/applyAdjustment'
 import { mergeSpread } from '../lib/mergeSpread'
+import { toExportChapters } from '../lib/toc/chapters'
 import { runExportInWorker } from '../lib/exportRunner'
 import type { ExportRequestPage } from '../workers/exportCore'
 import type { OcrResult } from '../lib/ocr/types'
-import type { AdjustmentParams, BookMetadata, PageEntry, RawImage } from '../types'
+import type { AdjustmentParams, BookMetadata, Chapter, PageEntry, RawImage } from '../types'
 
 export interface UseBookResult {
   pages: PageEntry[]
@@ -20,6 +21,8 @@ export interface UseBookResult {
   metadata: BookMetadata
   selectedPageId: string | null
   selectedImage: RawImage | null
+  /** 任意のページのプレビュー画素を取得する(選択中ページとは独立。目次の作成ステップの拡大表示用)。 */
+  getPagePreview: (id: string) => Promise<RawImage>
   importFiles: (files: File[]) => Promise<void>
   selectPage: (id: string) => Promise<void>
   updateAdjustment: (id: string, adjustment: AdjustmentParams) => Promise<void>
@@ -34,7 +37,11 @@ export interface UseBookResult {
   undoClearAll: () => Promise<void>
   confirmMerge: (firstId: string, secondId: string) => Promise<void>
   setMetadata: (metadata: BookMetadata) => void
-  exportBook: (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => Promise<Blob>
+  exportBook: (
+    format: 'pdf' | 'epub',
+    onProgress?: (done: number, total: number) => void,
+    options?: { embedChapters?: boolean },
+  ) => Promise<Blob>
   importProgress: { done: number; total: number } | null
   error: string | null
   clearError: () => void
@@ -87,6 +94,7 @@ export function useBook(): UseBookResult {
     pages: PageEntry[]
     blobs: [string, Blob][]
     ocr: OcrResult[]
+    chapters: Chapter[]
   } | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
@@ -287,6 +295,20 @@ export function useBook(): UseBookResult {
       return task
     },
     [],
+  )
+
+  // ウィザードの「選択中ページ」(selectedPageId/selectedImage)とは独立に、
+  // 任意のページのプレビュー画素を取得する(目次の作成ステップの拡大表示用)。
+  // loadPreviewのキャッシュを共有するので、選択中ページと重複しても二重デコードしない。
+  const getPagePreview = useCallback(
+    async (id: string): Promise<RawImage> => {
+      const store = await getStore()
+      if (!store) throw new Error('store not ready')
+      const preview = await loadPreview(id, store)
+      if (!preview) throw new Error(`page not found: ${id}`)
+      return preview
+    },
+    [getStore, loadPreview],
   )
 
   const showPreview = useCallback(
@@ -521,8 +543,14 @@ export function useBook(): UseBookResult {
       if (blob) snapshotBlobs.push([blobId, blob])
     }
     const snapshotOcr = await store.listOcr()
+    const snapshotChapters = await store.listChapters()
     await store.clearAll()
-    clearAllSnapshotRef.current = { pages: snapshotPages, blobs: snapshotBlobs, ocr: snapshotOcr }
+    clearAllSnapshotRef.current = {
+      pages: snapshotPages,
+      blobs: snapshotBlobs,
+      ocr: snapshotOcr,
+      chapters: snapshotChapters,
+    }
     setCanUndoClearAll(snapshotPages.length > 0)
     setThumbnails((current) => {
       for (const url of Object.values(current)) URL.revokeObjectURL(url)
@@ -537,7 +565,7 @@ export function useBook(): UseBookResult {
     const store = storeRef.current
     const snapshot = clearAllSnapshotRef.current
     if (!store || !snapshot) return
-    await store.restorePages(snapshot.pages, snapshot.blobs, snapshot.ocr)
+    await store.restorePages(snapshot.pages, snapshot.blobs, snapshot.ocr, snapshot.chapters)
     clearAllSnapshotRef.current = null
     setCanUndoClearAll(false)
     const restoredThumbnails: Record<string, string> = {}
@@ -609,7 +637,11 @@ export function useBook(): UseBookResult {
   )
 
   const exportBook = useCallback(
-    async (format: 'pdf' | 'epub', onProgress?: (done: number, total: number) => void) => {
+    async (
+      format: 'pdf' | 'epub',
+      onProgress?: (done: number, total: number) => void,
+      options?: { embedChapters?: boolean },
+    ) => {
       const store = storeRef.current
       if (!store) throw new Error('store not ready')
       // スライダー操作直後の書き出しで、遅延待ちのままの最後の調整値を
@@ -624,7 +656,14 @@ export function useBook(): UseBookResult {
         if (!blob) throw new Error(`image data not found for page: ${page.id}`)
         exportPages.push({ blob, adjustment: page.adjustment })
       }
-      return runExportInWorker({ format, metadata, pages: exportPages }, onProgress)
+      const chapters =
+        options?.embedChapters === false
+          ? []
+          : toExportChapters(
+              await store.listChapters(),
+              currentPages.map((p) => p.id),
+            )
+      return runExportInWorker({ format, metadata, pages: exportPages, chapters }, onProgress)
     },
     [metadata, flushPendingAdjustments],
   )
@@ -636,6 +675,7 @@ export function useBook(): UseBookResult {
     metadata,
     selectedPageId,
     selectedImage,
+    getPagePreview,
     importFiles,
     selectPage,
     updateAdjustment,
