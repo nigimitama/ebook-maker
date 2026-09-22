@@ -8,6 +8,7 @@ import { OcrReview } from './components/OcrReview'
 import { useChapters } from './hooks/useChapters'
 import { ChaptersStep } from './components/ChaptersStep'
 import { TitleStep } from './components/TitleStep'
+import { MetadataForm } from './components/MetadataForm'
 import { detectTocPages } from './lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from './lib/toc/parseToc'
 import { ExportPanel } from './components/ExportPanel'
@@ -302,11 +303,14 @@ export function App() {
           )}
 
           {step === 5 && (
-            <ExportPanel
-              onExport={book.exportBook}
-              title={book.metadata.title}
-              chapterCount={chapters.chapters.length}
-            />
+            <>
+              <MetadataForm metadata={book.metadata} onChange={book.setMetadata} />
+              <ExportPanel
+                onExport={book.exportBook}
+                title={book.metadata.title}
+                chapterCount={chapters.chapters.length}
+              />
+            </>
           )}
         </div>
       </div>

@@ -102,4 +102,30 @@ describe('TitleStep', () => {
     fireEvent.change(screen.getByTestId('title-input'), { target: { value: 'New' } })
     expect(onChange).toHaveBeenCalledWith({ title: 'New', author: 'A' })
   })
+
+  it('rounds a non-integer font size for the candidate size label', () => {
+    setup({
+      ocrResult: ocrOf([{ text: 'メインタイトル', w: 100, h: 47.31294250488281 }]),
+    })
+    expect(screen.getByText('47px')).toBeInTheDocument()
+  })
+
+  it('does not re-fill the title once the user clears it, for the same OCR result', () => {
+    const onChange = vi.fn()
+    const ocrResult = ocrOf([{ text: 'メインタイトル', w: 100, h: 60 }])
+    const { rerender, props } = setup({
+      ocrResult,
+      metadata: { title: '', author: '' },
+      onChange,
+    })
+    expect(onChange).toHaveBeenCalledWith({ title: 'メインタイトル', author: '' })
+    onChange.mockClear()
+
+    // ユーザーが自動入力されたタイトルを消した状態を再現する。ocrResult(と
+    // updatedAt)は変わっていないので、再度自動入力されてはならない。
+    rerender(
+      <TitleStep {...props} ocrResult={ocrResult} metadata={{ title: '', author: '' }} onChange={onChange} />,
+    )
+    expect(onChange).not.toHaveBeenCalled()
+  })
 })

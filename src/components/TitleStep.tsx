@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { OcrResult } from '../lib/ocr/types'
-import { lineFontSize, sortByFontSizeDesc } from '../lib/titleGuess'
+import { guessTitle, lineFontSize, sortByFontSizeDesc } from '../lib/titleGuess'
 import type { BookMetadata, PageEntry, RawImage } from '../types'
 import { MetadataForm } from './MetadataForm'
 import { AdjustedPreview, ZoomModal } from './ZoomModal'
@@ -54,9 +54,16 @@ export function TitleStep({
     }
   }, [zoomOpen, coverPage, getPagePreview])
 
+  // 新しいOCR結果が来たときだけタイトルを自動入力する。metadataの変化そのもの
+  // (ユーザーがタイトルを空に戻した場合など)では発火させない。そうしないと、
+  // 一度自動入力した後にユーザーが消しても即座に同じ候補が再入力されてしまう。
+  const appliedOcrKeyRef = useRef<number | null>(null)
   useEffect(() => {
+    const key = ocrResult?.updatedAt ?? null
+    if (key === null || key === appliedOcrKeyRef.current) return
+    appliedOcrKeyRef.current = key
     if (metadata.title !== '') return
-    const guess = sortByFontSizeDesc(ocrResult)[0]?.text ?? ''
+    const guess = guessTitle(ocrResult)
     if (guess !== '') onChange({ ...metadata, title: guess })
   }, [ocrResult, metadata, onChange])
 
@@ -93,16 +100,20 @@ export function TitleStep({
 
       <div className="panel">
         <h2>候補(文字サイズが大きい順)</h2>
-        {candidates.length === 0 && <p>OCR結果がありません。表紙をOCRしてください。</p>}
+        {candidates.length === 0 && ocrResult === undefined && (
+          <p>OCR結果がありません。表紙をOCRしてください。</p>
+        )}
+        {candidates.length === 0 && ocrResult !== undefined && <p>OCR結果に文字が見つかりませんでした。</p>}
         {candidates.length > 0 && (
           <ul className="title-step__candidates">
             {candidates.map((line) => (
               <li key={line.id} className="title-step__candidate">
                 <span className="title-step__candidate-text">{line.text}</span>
-                <span className="title-step__candidate-size">{`${lineFontSize(line)}px`}</span>
+                <span className="title-step__candidate-size">{`${Math.round(lineFontSize(line))}px`}</span>
                 <button
                   type="button"
                   className={metadata.title === line.text ? 'btn btn-primary' : 'btn btn-ghost'}
+                  aria-label={`「${line.text}」をタイトルにする`}
                   onClick={() => onChange({ ...metadata, title: line.text })}
                 >
                   タイトルにする
@@ -110,6 +121,7 @@ export function TitleStep({
                 <button
                   type="button"
                   className={metadata.author === line.text ? 'btn btn-primary' : 'btn btn-ghost'}
+                  aria-label={`「${line.text}」を著者にする`}
                   onClick={() => onChange({ ...metadata, author: line.text })}
                 >
                   著者にする
