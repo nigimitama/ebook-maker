@@ -4,6 +4,7 @@ import { newChapterId, sortChapters } from '../lib/toc/chapters'
 import { detectTocPages, tocScanWindow } from '../lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from '../lib/toc/parseToc'
 import type { Chapter, PageEntry } from '../types'
+import { ZoomModal } from './ZoomModal'
 
 export interface ChaptersStepProps {
   pages: PageEntry[]
@@ -30,6 +31,10 @@ export function ChaptersStep({
   const [bodyStart, setBodyStart] = useState(1) // 画像の何枚目が印刷ページ1か(1始まり)
   const [bodyStartEdited, setBodyStartEdited] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // サムネイルは小さく読みにくいので、クリックで拡大表示するモーダルを出す
+  // (並べ替えページのZoomModalを流用。ここでは既に持っているサムネイル画像を
+  // そのまま拡大するだけで、原本の再デコードはしない)。
+  const [zoomPageId, setZoomPageId] = useState<string | null>(null)
 
   const windowSize = tocScanWindow(pages.length)
   const detection = useMemo(() => detectTocPages(pageIds, ocrResults), [pageIds, ocrResults])
@@ -83,6 +88,7 @@ export function ChaptersStep({
   }
 
   const unscanned = detection.unscannedPageIds
+  const zoomPage = pages.find((p) => p.id === zoomPageId) ?? null
 
   return (
     <div className="chapters-step">
@@ -109,7 +115,19 @@ export function ChaptersStep({
             const hasOcr = Boolean(ocrResults[p.id])
             return (
               <label key={p.id} className="chapters-step__page">
-                {thumbnails[p.id] && <img src={thumbnails[p.id]} alt="" />}
+                {thumbnails[p.id] && (
+                  <button
+                    type="button"
+                    className="chapters-step__thumb-btn"
+                    aria-label={`${i + 1}枚目を拡大表示`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      setZoomPageId(p.id)
+                    }}
+                  >
+                    <img src={thumbnails[p.id]} alt="" />
+                  </button>
+                )}
                 <input
                   type="checkbox"
                   aria-label={`${i + 1}枚目を目次ページにする`}
@@ -153,7 +171,16 @@ export function ChaptersStep({
         {chapters.length === 0 && <p>目次はまだありません。目次を解析するか、手で追加してください。</p>}
         {chapters.map((chapter, i) => (
           <div key={chapter.id} className="chapters-step__row">
-            {thumbnails[chapter.pageId] && <img src={thumbnails[chapter.pageId]} alt="" />}
+            {thumbnails[chapter.pageId] && (
+              <button
+                type="button"
+                className="chapters-step__thumb-btn"
+                aria-label={`章${i + 1}の開始ページを拡大表示`}
+                onClick={() => setZoomPageId(chapter.pageId)}
+              >
+                <img src={thumbnails[chapter.pageId]} alt="" />
+              </button>
+            )}
             <input
               type="text"
               aria-label={`章${i + 1}のタイトル`}
@@ -193,6 +220,15 @@ export function ChaptersStep({
           章を追加
         </button>
       </div>
+
+      {zoomPage && thumbnails[zoomPage.id] && (
+        <ZoomModal
+          label={zoomPage.fileName ?? `page ${zoomPage.order + 1}`}
+          onClose={() => setZoomPageId(null)}
+        >
+          <img src={thumbnails[zoomPage.id]} alt="" />
+        </ZoomModal>
+      )}
     </div>
   )
 }

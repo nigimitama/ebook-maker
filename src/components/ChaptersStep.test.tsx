@@ -134,4 +134,25 @@ describe('ChaptersStep', () => {
     fireEvent.click(screen.getByLabelText('2枚目を目次ページにする'))
     expect(screen.getByLabelText('本文1ページ目は画像何枚目か')).toHaveValue(7)
   })
+
+  it('opens an enlarged preview of a toc-page thumbnail without toggling its checkbox', () => {
+    setup()
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    expect(screen.getByLabelText('3枚目を目次ページにする')).not.toBeChecked()
+  })
+
+  it('opens an enlarged preview of a chapter row thumbnail', () => {
+    setup({ chapters: [{ id: 'c1', title: 'A', pageId: 'p2', level: 1 }] })
+    fireEvent.click(screen.getByLabelText('章1の開始ページを拡大表示'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+  })
+
+  it('closes the enlarged preview on Escape', () => {
+    setup()
+    fireEvent.click(screen.getByLabelText('3枚目を拡大表示'))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
 })
