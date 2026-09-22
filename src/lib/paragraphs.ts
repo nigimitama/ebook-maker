@@ -1,10 +1,20 @@
-import type { OcrLine } from './ocr/types'
+import type { Box, OcrLine } from './ocr/types'
 
 export interface OcrParagraph {
   /** 段落の代表key(先頭行のid)。Reactのkey等に使う。 */
   id: string
   text: string
   lines: OcrLine[]
+  /** 所属する行の外接矩形(原本画像のpx座標)。拡大表示の枠に使う。 */
+  box: Box
+}
+
+function unionBox(lines: OcrLine[]): Box {
+  const x0 = Math.min(...lines.map((l) => l.x))
+  const y0 = Math.min(...lines.map((l) => l.y))
+  const x1 = Math.max(...lines.map((l) => l.x + l.w))
+  const y1 = Math.max(...lines.map((l) => l.y + l.h))
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
 }
 
 /**
@@ -31,6 +41,7 @@ export function buildParagraphs(lines: OcrLine[]): OcrParagraph[] {
       id: groupLines[0].id,
       text: groupLines.map((l) => l.text).join(''),
       lines: groupLines,
+      box: unionBox(groupLines),
     }
   })
 }
