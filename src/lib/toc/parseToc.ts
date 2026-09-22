@@ -26,6 +26,38 @@ const LEVEL2_PATTERNS = [
 // 「第」「Chapter」だけのような見出しの断片は、番号を続けてもタイトルとして採らない。
 const HEADING_FRAGMENT = /^(chapter|part|section|page|no|p|第)\.?$/i
 
+// 縦書きの本では、ページ番号が「二一」(=21)のように漢数字1文字ずつの並びで
+// 組まれることがある(位取りの「十」「百」は使わない、桁ごとの置き換え式)。
+// 「一」「二」等は通常の単語にもよく出るため、章名の末尾に付いた形での抽出は誤検出の
+// リスクが高い。番号だけが単独の行になっているときに限って解釈する
+// (単独の算用数字の行のみをページ番号として扱う既存の扱いと同じ考え方)。
+const KANJI_DIGITS: Record<string, number> = {
+  〇: 0,
+  一: 1,
+  二: 2,
+  三: 3,
+  四: 4,
+  五: 5,
+  六: 6,
+  七: 7,
+  八: 8,
+  九: 9,
+}
+const BARE_KANJI_NUMBER = /^[〇一二三四五六七八九]{1,4}$/
+
+function kanjiDigitsToNumber(text: string): number | null {
+  let value = 0
+  for (const ch of text) value = value * 10 + KANJI_DIGITS[ch]
+  return value
+}
+
+/** 独立した1行が算用数字・漢数字いずれかのページ番号として読めれば、その値を返す。 */
+function parseBareNumber(text: string): number | null {
+  if (/^\d{1,4}$/.test(text)) return Number(text)
+  if (BARE_KANJI_NUMBER.test(text)) return kanjiDigitsToNumber(text)
+  return null
+}
+
 function cleanTitle(value: string): string {
   return value.replace(TRAILING_LEADER, '').trim()
 }
@@ -51,8 +83,9 @@ export function parseTocEntries(lines: string[]): TocEntry[] {
   for (const raw of lines) {
     const text = raw.normalize('NFKC').trim()
     if (text === '') continue
-    if (/^\d{1,4}$/.test(text)) {
-      if (pending !== null && isValidTitle(pending)) push(pending, Number(text))
+    const bareNumber = parseBareNumber(text)
+    if (bareNumber !== null) {
+      if (pending !== null && isValidTitle(pending)) push(pending, bareNumber)
       pending = null
       continue
     }

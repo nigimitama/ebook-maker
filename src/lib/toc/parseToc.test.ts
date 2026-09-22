@@ -60,6 +60,21 @@ describe('parseTocEntries', () => {
   it('ignores page number 0 and numbers of more than 4 digits', () => {
     expect(parseTocEntries(['付録 ..... 0', '年表 ..... 12345'])).toEqual([])
   })
+
+  // 縦書きの本ではページ番号が漢数字(一,二,…)の桁ごとの並びで組まれることがある。
+  // 「一」「二」等は通常の単語にも出るため、独立した行としてのみページ番号扱いする。
+  it('reads a kanji-digit number on its own line as the page number', () => {
+    expect(parseTocEntries(['第一章 発端', '一', '第二章 邂逅', '二一', '第四章 結末', '八九'])).toEqual([
+      { title: '第一章 発端', printedPage: 1, level: 1 },
+      { title: '第二章 邂逅', printedPage: 21, level: 1 },
+      { title: '第四章 結末', printedPage: 89, level: 1 },
+    ])
+  })
+
+  it('does not read a kanji digit inline at the end of an ordinary title as a page number', () => {
+    // 「唯一」のように、通常の単語の末尾がたまたま漢数字と同じ文字になるケース。
+    expect(parseTocEntries(['これは唯一の方法である'])).toEqual([])
+  })
 })
 
 describe('entriesToChapters', () => {
@@ -117,5 +132,40 @@ describe('parseToc', () => {
 
   it('skips toc pages that have no OCR result', () => {
     expect(parseToc(['t1'], {}, ['t1', 'b1'], 1)).toEqual([])
+  })
+})
+
+describe('parseTocEntries on transcribed real-looking layouts', () => {
+  it('extracts chapter and section entries with page numbers on separate lines (02_nested_sections)', () => {
+    const entries = parseTocEntries([
+      'Contents',
+      '第1章 序論',
+      '1',
+      '1.1 研究背景',
+      '2',
+      '1.2 問題設定',
+      '5',
+      '第2章 関連研究',
+      '9',
+      '2.1 統計的手法',
+      '10',
+    ])
+    expect(entries.map((e) => [e.title, e.printedPage, e.level])).toEqual([
+      ['第1章 序論', 1, 1],
+      ['1.1 研究背景', 2, 2],
+      ['1.2 問題設定', 5, 2],
+      ['第2章 関連研究', 9, 1],
+      ['2.1 統計的手法', 10, 2],
+    ])
+  })
+
+  it('extracts every entry from an interleaved two-column list (03_two_column)', () => {
+    const entries = parseTocEntries(['1. 概要 3', '7. 学習 41', '2. 環境構築 6', '8. 評価 50'])
+    expect(entries.map((e) => [e.title, e.printedPage])).toEqual([
+      ['1. 概要', 3],
+      ['7. 学習', 41],
+      ['2. 環境構築', 6],
+      ['8. 評価', 50],
+    ])
   })
 })
