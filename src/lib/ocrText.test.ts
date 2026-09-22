@@ -24,6 +24,19 @@ describe('buildPlainText', () => {
   it('結果が無ければ空文字', () => {
     expect(buildPlainText([{ id: 'a' }], {})).toBe('')
   })
+
+  it('同じブロックの行は改行を入れずに連結する', () => {
+    const withBlock: OcrResult = {
+      pageId: 'a',
+      modelVersion: 'v',
+      updatedAt: 1,
+      lines: [
+        { id: 'a0', x: 0, y: 0, w: 1, h: 1, text: '吾輩は猫である。名前はまだ', edited: false, blockId: 'b1' },
+        { id: 'a1', x: 0, y: 0, w: 1, h: 1, text: '無い。', edited: false, blockId: 'b1' },
+      ],
+    }
+    expect(buildPlainText([{ id: 'a' }], { a: withBlock })).toBe('吾輩は猫である。名前はまだ無い。')
+  })
 })
 
 describe('buildPlainText: 全行が空のページ', () => {
