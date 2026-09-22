@@ -11,7 +11,7 @@ interface ExportPanelProps {
     options?: { embedChapters: boolean },
   ) => Promise<Blob>
   title?: string
-  // 章立てが1件以上あるときだけ「しおり・目次を埋め込む」を出す。
+  // 目次が1件以上あるときだけ「しおり・目次を埋め込む」を出す。
   chapterCount?: number
 }
 

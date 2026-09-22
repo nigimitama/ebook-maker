@@ -126,7 +126,7 @@ describe('ChaptersStep', () => {
 
   it('labels the parse button as a replacement when chapters already exist', () => {
     setup({ chapters: [{ id: 'c1', title: 'A', pageId: 'p2', level: 1 }] })
-    expect(screen.getByText('目次を解析して章立てを置き換える')).toBeInTheDocument()
+    expect(screen.getByText('目次を解析して置き換える')).toBeInTheDocument()
   })
   it('keeps a hand-edited body offset when toc pages are toggled', () => {
     setup()

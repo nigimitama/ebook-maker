@@ -18,10 +18,10 @@ export interface UseChaptersOptions {
 
 function describeSaveError(error: unknown): string {
   if (typeof error === 'object' && error !== null && (error as { name?: unknown }).name === 'QuotaExceededError') {
-    return '章立ての保存に失敗しました: ストレージの空き容量が足りません'
+    return '目次の保存に失敗しました: ストレージの空き容量が足りません'
   }
   const reason = error instanceof Error ? error.message : String(error)
-  return `章立ての保存に失敗しました: ${reason}`
+  return `目次の保存に失敗しました: ${reason}`
 }
 
 function clampLevels(chapters: Chapter[]): Chapter[] {

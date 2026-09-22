@@ -66,7 +66,7 @@ describe('useChapters', () => {
     await act(async () => {
       await expect(result.current.setChapters([ch('c1', 'a')])).rejects.toThrow('disk full')
     })
-    expect(result.current.error).toContain('章立ての保存に失敗しました')
+    expect(result.current.error).toContain('目次の保存に失敗しました')
     act(() => result.current.clearError())
     expect(result.current.error).toBeNull()
     spy.mockRestore()

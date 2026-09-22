@@ -75,7 +75,7 @@ describe('installAutomationApi', () => {
 
     const methods = window.EbookMaker!.describe().methods
     expect(methods.goToStep).toContain('2:OCR確認・修正')
-    expect(methods.goToStep).toContain('3:章立て')
+    expect(methods.goToStep).toContain('3:目次の作成')
     expect(methods.goToStep).toContain('4:詳細＆書き出し')
     for (const name of ['runOcr', 'runOcrAll', 'getOcr', 'setOcrLineText'] as const) {
       expect(methods[name]).toBeTruthy()

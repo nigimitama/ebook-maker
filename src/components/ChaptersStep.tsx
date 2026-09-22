@@ -143,14 +143,14 @@ export function ChaptersStep({
           disabled={tocPageIds.length === 0}
           onClick={handleParse}
         >
-          {chapters.length > 0 ? '目次を解析して章立てを置き換える' : '目次を解析'}
+          {chapters.length > 0 ? '目次を解析して置き換える' : '目次を解析'}
         </button>
         {notice && <p role="status">{notice}</p>}
       </div>
 
       <div className="panel">
-        <h2>章立て</h2>
-        {chapters.length === 0 && <p>章立てはまだありません。目次を解析するか、手で追加してください。</p>}
+        <h2>目次</h2>
+        {chapters.length === 0 && <p>目次はまだありません。目次を解析するか、手で追加してください。</p>}
         {chapters.map((chapter, i) => (
           <div key={chapter.id} className="chapters-step__row">
             {thumbnails[chapter.pageId] && <img src={thumbnails[chapter.pageId]} alt="" />}

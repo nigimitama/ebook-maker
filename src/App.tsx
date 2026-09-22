@@ -14,7 +14,7 @@ import { ExportPanel } from './components/ExportPanel'
 import { DEFAULT_ADJUSTMENT } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
-const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', '章立て', '詳細＆書き出し'] as const
+const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', '目次の作成', '詳細＆書き出し'] as const
 
 export function App() {
   const book = useBook()
@@ -165,11 +165,11 @@ export function App() {
             {step === 2 && (
               <>
                 <button type="button" className="btn btn-primary" onClick={() => goTo(3)}>
-                  章立てへ進む
+                  目次の作成へ進む
                 </button>
-                {/* 章立ても任意工程。既存の章立ては消さずに書き出しへ進む。 */}
+                {/* 目次の作成も任意工程。既存の章立ては消さずに書き出しへ進む。 */}
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
-                  章立てをスキップして書き出しへ
+                  目次の作成をスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
                   戻る
@@ -188,7 +188,7 @@ export function App() {
             )}
             {step === 4 && (
               <button type="button" className="btn btn-ghost" onClick={() => goTo(3)}>
-                章立てへ戻る
+                目次の作成へ戻る
               </button>
             )}
           </div>

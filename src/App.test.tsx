@@ -65,7 +65,7 @@ describe('App', () => {
   it('shows the five steps of the flow', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
     render(<App />)
-    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '章立て', '詳細＆書き出し']) {
+    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '目次の作成', '詳細＆書き出し']) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -80,28 +80,28 @@ describe('App', () => {
     expect(screen.getByText('このページをOCR')).toBeInTheDocument()
   })
 
-  it('advances from the OCR確認・修正 step to the 章立て step, then to 詳細＆書き出し', () => {
+  it('advances from the OCR確認・修正 step to the 目次の作成 step, then to 詳細＆書き出し', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
-    fireEvent.click(screen.getByText('章立てへ進む'))
+    fireEvent.click(screen.getByText('目次の作成へ進む'))
     expect(screen.getByText('章を追加')).toBeInTheDocument()
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
   })
 
-  // 章立ても任意工程。OCR確認から直接書き出しへ進める。
-  it('lets the user skip the 章立て step', () => {
+  // 目次の作成も任意工程。OCR確認から直接書き出しへ進める。
+  it('lets the user skip the 目次の作成 step', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
-    fireEvent.click(screen.getByText('章立てをスキップして書き出しへ'))
+    fireEvent.click(screen.getByText('目次の作成をスキップして書き出しへ'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
     expect(screen.queryByText('章を追加')).not.toBeInTheDocument()
   })
@@ -118,16 +118,16 @@ describe('App', () => {
     expect(screen.queryByText('このページをOCR')).not.toBeInTheDocument()
   })
 
-  it('returns from the 書き出し step to the 章立て step', () => {
+  it('returns from the 書き出し step to the 目次の作成 step', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
-    fireEvent.click(screen.getByText('章立てへ進む'))
+    fireEvent.click(screen.getByText('目次の作成へ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
-    fireEvent.click(screen.getByText('章立てへ戻る'))
+    fireEvent.click(screen.getByText('目次の作成へ戻る'))
     expect(screen.getByText('章を追加')).toBeInTheDocument()
   })
 
@@ -196,11 +196,11 @@ describe('App', () => {
     vi.spyOn(useChaptersModule, 'useChapters').mockReturnValue({
       chapters: [],
       setChapters: vi.fn(),
-      error: '章立ての保存に失敗しました: x',
+      error: '目次の保存に失敗しました: x',
       clearError,
     })
     render(<App />)
-    expect(screen.getByTestId('error-banner')).toHaveTextContent('章立ての保存に失敗しました: x')
+    expect(screen.getByTestId('error-banner')).toHaveTextContent('目次の保存に失敗しました: x')
     fireEvent.click(screen.getByText('閉じる'))
     expect(clearError).toHaveBeenCalled()
   })
