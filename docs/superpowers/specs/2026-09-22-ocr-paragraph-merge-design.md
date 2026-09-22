@@ -47,11 +47,11 @@ DEIMのレイアウト検出は、行(line_main等)のbboxとは別に、段落�
 - `src/lib/ocrText.ts`の`buildPlainText`: ページごとに`buildParagraphs(r.lines)`の各段落テキストを(空でないものだけ)`\n`で連結する(段落内に改行は入らない)。ページ間は空行。既存の「未OCR・空ページは飛ばす」挙動は変えない。
 - `src/components/OcrParagraphList.tsx`(新規): 読み取り専用の段落プレビュー。`buildParagraphs`の結果を`<p>`ごとに表示する。
 - `src/components/OcrReview.tsx`: 行一覧パネル(`.ocr-review__lines`)に「行ごと/段落プレビュー」のトグルボタンを追加し、`OcrLineList`(既存、編集用)と`OcrParagraphList`(新規、読み取り専用)を切り替える。`OcrLineList`自体は変更しない。
+- `src/components/OcrOverlay.tsx`: `variant`('line'|'paragraph')を追加し、段落プレビュー中は画像に重ねる枠も行の枠(`OcrLine`)ではなく段落(所属行の外接矩形、`OcrParagraph.box`)の枠に切り替える。段落の枠は読み取り専用(クリック不可・選択ハイライトなし・破線で区別)。段落プレビュー中は「枠を追加」を無効化する(行編集用の操作のため)。
 - 目次の作成ステップ(`ChaptersStep`)の拡大モーダルのOCRパネルは対象外(目次ページは行単位の候補抽出が主目的のため)。
 
 ## 対象外(YAGNI)
 
-- 段落bboxの画像オーバーレイ表示(行のオーバーレイのみ existing のまま)。
 - 段落単位の編集(修正は引き続き行単位)。
 - 英語混じりテキストでの語間スペース補完。
 - `window.EbookMaker`への段落API追加(既存の`useBook`レベル操作の追加ではないため)。
