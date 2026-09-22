@@ -32,4 +32,18 @@ describe('fetchVerified', () => {
     }
     expect((await fetchVerified(['p', 's'], 'A', { fetch, verifyHash })).toString()).toBe('A')
   })
+  it('一次がハングしてタイムアウトしたら二次を試す', async () => {
+    const fetch = async (u: string, init: { signal: AbortSignal }) => {
+      if (u === 'p') {
+        return new Promise((_resolve, reject) => {
+          init.signal.addEventListener('abort', () =>
+            reject(new DOMException('The operation was aborted.', 'AbortError')),
+          )
+        })
+      }
+      return ok('A')
+    }
+    const buf = await fetchVerified(['p', 's'], 'A', { fetch, verifyHash, timeoutMs: 20 })
+    expect(buf.toString()).toBe('A')
+  })
 })

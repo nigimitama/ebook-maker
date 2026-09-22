@@ -11,11 +11,12 @@
 // とする。
 import { MODEL_FILES, sha256Hex } from './modelFiles.mjs'
 import { fetchFromR2 as defaultFetchFromR2, r2FallbackEnabled } from './r2Source.mjs'
+import { fetchWithTimeout } from './fetchTimeout.mjs'
 
 /** 取得して期待ハッシュと突き合わせる。例外は投げず結果に畳み込む。 */
-async function checkUrl(url, expected, doFetch) {
+async function checkUrl(url, expected, doFetch, timeoutMs) {
   try {
-    const res = await doFetch(url)
+    const res = await fetchWithTimeout(doFetch, url, {}, timeoutMs)
     if (!res.ok) return { ok: false, detail: `HTTP ${res.status}` }
     return checkBuffer(Buffer.from(await res.arrayBuffer()), expected)
   } catch (e) {
@@ -48,6 +49,7 @@ export async function verifyAll(files, env, deps = {}) {
   const doFetch = deps.fetch ?? fetch
   const doFetchFromR2 = deps.fetchFromR2 ?? defaultFetchFromR2
   const log = deps.log ?? console.log
+  const timeoutMs = deps.timeoutMs
 
   const r2 = r2FallbackEnabled(env)
   log(r2 ? 'R2 ミラー: Secrets あり → 検査対象に含めます' : 'R2 ミラー: Secrets なし → 公式ソースのみ検査します')
@@ -60,7 +62,7 @@ export async function verifyAll(files, env, deps = {}) {
     log(`\n=== ${f.dest} (sha256=${f.sha256 ?? '未記録'})`)
     let officialAlive = 0
     for (const url of f.sources) {
-      const r = await checkUrl(url, f.sha256, doFetch)
+      const r = await checkUrl(url, f.sha256, doFetch, timeoutMs)
       if (r.ok) officialAlive += 1
       log(`  ${r.ok ? 'OK  ' : 'FAIL'} 公式 ${url} — ${r.detail}`)
     }

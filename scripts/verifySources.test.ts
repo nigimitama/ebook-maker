@@ -116,4 +116,22 @@ describe('verifyAll の警報条件', () => {
     expect(r.officialDead).toEqual([file.dest])
     expect(r.out).toContain('ECONNRESET')
   })
+
+  it('公式ソースがハングしたらタイムアウトとして公式失敗扱いになる', async () => {
+    const hangingFetch = (_url: string, init: { signal: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () =>
+          reject(new DOMException('The operation was aborted.', 'AbortError')),
+        )
+      })
+    const logs: string[] = []
+    const r = await verifyAll([file], fullEnv, {
+      fetch: hangingFetch as unknown as typeof fetch,
+      fetchFromR2: okR2,
+      timeoutMs: 20,
+      log: (m: string) => logs.push(m),
+    })
+    expect(r.officialDead).toEqual([file.dest])
+    expect(logs.join('\n')).toContain('タイムアウト')
+  })
 })

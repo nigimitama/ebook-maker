@@ -2,6 +2,7 @@ import { createHash, createHmac } from 'node:crypto'
 import { mirrorKey, validateBucket } from './mirrorPlan.mjs'
 import { fetchVerified } from './fetchWithFallback.mjs'
 import { verifyHash } from './modelFiles.mjs'
+import { fetchWithTimeout } from './fetchTimeout.mjs'
 
 // R2 は S3互換API を公開しており、アクセスキーID + シークレットアクセスキーの組による
 // AWS Signature Version 4(region="auto", service="s3")で1オブジェクトを GET できる。
@@ -103,7 +104,7 @@ export async function fetchFromR2(file, env, deps = {}) {
 
   let res
   try {
-    res = await doFetch(url, { method: 'GET', headers })
+    res = await fetchWithTimeout(doFetch, url, { method: 'GET', headers }, deps.timeoutMs)
   } catch (e) {
     // 認証情報は組み立て済みヘッダにしか入っていないので、メッセージには URL のみ載せる。
     throw new Error(`R2 ミラーへの接続に失敗しました: ${url}: ${e instanceof Error ? e.message : String(e)}`)

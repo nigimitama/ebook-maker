@@ -124,6 +124,18 @@ describe('fetchFromR2', () => {
     ).rejects.toThrow(/ECONNRESET/)
   })
 
+  it('ハングした接続はタイムアウトメッセージを含む例外になる', async () => {
+    const hangingFetch = (_url: string, init: { signal: AbortSignal }) =>
+      new Promise((_resolve, reject) => {
+        init.signal.addEventListener('abort', () =>
+          reject(new DOMException('The operation was aborted.', 'AbortError')),
+        )
+      })
+    await expect(
+      fetchFromR2(file, fullEnv, { fetch: hangingFetch as unknown as typeof fetch, timeoutMs: 20 }),
+    ).rejects.toThrow(/タイムアウト/)
+  })
+
   it('Secrets が不足していれば呼ぶ前に例外', async () => {
     const r = recorder(() => new Response('x', { status: 200 }))
     await expect(
