@@ -7,6 +7,7 @@ import { buildParagraphs } from '../lib/paragraphs'
 import { OcrLineList } from './OcrLineList'
 import { OcrOverlay } from './OcrOverlay'
 import { OcrParagraphList } from './OcrParagraphList'
+import { OcrSettings } from './OcrSettings'
 import { ProgressBar } from './ProgressBar'
 
 export interface OcrReviewProps {
@@ -108,7 +109,13 @@ export function OcrReview({
   }, [overwrite, watched])
 
   const stage = ocr.progress?.stage
-  const progressLabel = stage && STAGE_LABEL[stage] ? STAGE_LABEL[stage] : '文字認識中'
+  const parallel = ocr.progress?.concurrency ?? 1
+  const progressLabel =
+    stage && STAGE_LABEL[stage]
+      ? STAGE_LABEL[stage]
+      : parallel > 1
+        ? `文字認識中(${parallel}並列)`
+        : '文字認識中'
 
   return (
     <div className="ocr-review">
@@ -120,6 +127,13 @@ export function OcrReview({
           </button>
         </div>
       )}
+
+      <OcrSettings
+        value={ocr.concurrency}
+        max={ocr.maxConcurrency}
+        disabled={ocr.running}
+        onChange={ocr.setConcurrency}
+      />
 
       <div className="ocr-review__toolbar">
         <button

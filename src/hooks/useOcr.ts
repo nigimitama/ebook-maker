@@ -83,7 +83,7 @@ export function useOcr(
   const cores =
     options.cores ?? (typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency)
   const maxConcurrency = maxOcrConcurrency(cores)
-  const storageRef = useRef(options.storage ?? browserStorage())
+  const [storage] = useState(() => options.storage ?? browserStorage())
   const createRunnerRef = useRef(options.createRunner ?? (() => createOcrRunner()))
   const getStoreRef = useRef(getStore)
   useEffect(() => {
@@ -103,7 +103,7 @@ export function useOcr(
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [storedConcurrency, setStoredConcurrency] = useState(() =>
-    loadOcrConcurrency(maxConcurrency, storageRef.current),
+    loadOcrConcurrency(maxConcurrency, storage),
   )
   const concurrency = clampOcrConcurrency(storedConcurrency, maxConcurrency)
   // runAll は開始時点の値を読むので、描画を待たずに最新値を持っておく。
@@ -115,12 +115,12 @@ export function useOcr(
   const setConcurrency = useCallback(
     (n: number) => {
       const value = clampOcrConcurrency(n, maxConcurrency)
-      saveOcrConcurrency(value, storageRef.current)
+      saveOcrConcurrency(value, storage)
       concurrencyRef.current = value
       setStoredConcurrency(value)
       return value
     },
-    [maxConcurrency],
+    [maxConcurrency, storage],
   )
 
   const setResults = useCallback((next: Record<string, OcrResult>) => {
