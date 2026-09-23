@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ChaptersStep, type ChaptersStepProps } from './ChaptersStep'
+import { EMPTY_TOC_SELECTION } from '../types'
 import type { OcrResult } from '../lib/ocr/types'
 import type { Chapter, PageEntry, RawImage } from '../types'
 
@@ -41,8 +43,30 @@ const tocTexts = [
 const pages = Array.from({ length: 10 }, (_, i) => page(`p${i + 1}`, i))
 const thumbnails = Object.fromEntries(pages.map((p) => [p.id, `blob:${p.id}`]))
 
-function setup(overrides: Partial<ChaptersStepProps> = {}) {
-  const props: ChaptersStepProps = {
+type HarnessProps = Omit<ChaptersStepProps, 'tocSelection' | 'onTocSelectionChange'> & {
+  /** false で工程を離れた(アンマウントした)状態を再現する。 */
+  show?: boolean
+  /** 指定すると chapters を状態として持ち、onChange を実際に反映する。 */
+  initialChapters?: Chapter[]
+}
+
+// 目次ページの選択はApp側が持つ(工程をまたいでも消えないように)。その親の代わり。
+function Harness({ show = true, initialChapters, ...props }: HarnessProps) {
+  const [tocSelection, setTocSelection] = useState(EMPTY_TOC_SELECTION)
+  const [chapters, setChapters] = useState(initialChapters ?? [])
+  if (!show) return null
+  return (
+    <ChaptersStep
+      {...props}
+      {...(initialChapters ? { chapters, onChange: setChapters } : {})}
+      tocSelection={tocSelection}
+      onTocSelectionChange={setTocSelection}
+    />
+  )
+}
+
+function setup(overrides: Partial<HarnessProps> = {}) {
+  const props: HarnessProps = {
     pages,
     thumbnails,
     ocrResults: { p1: ocr('p1', tocTexts), p2: ocr('p2', ['本文']), p3: ocr('p3', ['本文']) },
@@ -56,11 +80,67 @@ function setup(overrides: Partial<ChaptersStepProps> = {}) {
     onMoveOcrLine: vi.fn(),
     ...overrides,
   }
-  render(<ChaptersStep {...props} />)
-  return props
+  const view = render(<Harness {...props} />)
+  return Object.assign(props, {
+    rerenderWith: (next: Partial<HarnessProps>) => view.rerender(<Harness {...props} {...next} />),
+  })
 }
 
+function setupStateful(initial: Chapter[]) {
+  return setup({ initialChapters: initial })
+}
+
+const handMade: Chapter[] = [
+  { id: 'c1', title: '手で直した章', pageId: 'p2', level: 1 },
+  { id: 'c2', title: '別の章', pageId: 'p5', level: 1 },
+]
+
+const titles = () =>
+  screen.queryAllByRole('textbox', { name: /章\d+のタイトル/ }).map((el) => (el as HTMLInputElement).value)
+
 describe('ChaptersStep', () => {
+  // 解析で置き換えると手で直した章立てが消えるので、直後に取り消せるようにする。
+  it('undoes replacing the chapters with a fresh parse', () => {
+    setupStateful(handMade)
+    fireEvent.click(screen.getByText('目次を解析して置き換える'))
+    expect(titles()).toContain('第2章 手法')
+    fireEvent.click(screen.getByRole('button', { name: '「目次の置き換え」を取り消す' }))
+    expect(titles()).toEqual(['手で直した章', '別の章'])
+    expect(screen.queryByRole('button', { name: /を取り消す/ })).not.toBeInTheDocument()
+  })
+
+  it('undoes deleting a chapter', () => {
+    setupStateful(handMade)
+    fireEvent.click(screen.getByLabelText('章1を削除'))
+    expect(titles()).toEqual(['別の章'])
+    expect(screen.getByRole('status')).toHaveTextContent('「手で直した章」を削除しました')
+    fireEvent.click(screen.getByRole('button', { name: '「章の削除」を取り消す' }))
+    expect(titles()).toEqual(['手で直した章', '別の章'])
+  })
+
+  // 取り消しのあとに加えた編集を巻き戻さないよう、ほかの編集をしたら取り消しは消える。
+  it('drops the undo once the chapters are edited again', () => {
+    setupStateful(handMade)
+    fireEvent.click(screen.getByLabelText('章1を削除'))
+    fireEvent.change(screen.getByLabelText('章1のタイトル'), { target: { value: '改題' } })
+    expect(screen.queryByRole('button', { name: /を取り消す/ })).not.toBeInTheDocument()
+  })
+
+  // 工程を離れて戻ってきても、手で選び直した目次ページと本文の開始位置は残す。
+  it('keeps the chosen toc pages and body start when the step is left and reopened', () => {
+    const view = setup()
+    fireEvent.click(screen.getByLabelText('1枚目を目次ページにする'))
+    fireEvent.click(screen.getByLabelText('2枚目を目次ページにする'))
+    fireEvent.change(screen.getByLabelText('本文1ページ目は画像何枚目か'), { target: { value: '4' } })
+
+    view.rerenderWith({ show: false })
+    view.rerenderWith({ show: true })
+
+    expect(screen.getByLabelText('1枚目を目次ページにする')).not.toBeChecked()
+    expect(screen.getByLabelText('2枚目を目次ページにする')).toBeChecked()
+    expect(screen.getByLabelText('本文1ページ目は画像何枚目か')).toHaveValue(4)
+  })
+
   it('auto-detects the toc page on open and parses it into chapters', () => {
     const props = setup()
     expect(screen.getByLabelText('1枚目を目次ページにする')).toBeChecked()

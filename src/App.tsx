@@ -12,27 +12,47 @@ import { MetadataForm } from './components/MetadataForm'
 import { detectTocPages } from './lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from './lib/toc/parseToc'
 import { ExportPanel } from './components/ExportPanel'
-import { DEFAULT_ADJUSTMENT } from './types'
+import { DEFAULT_ADJUSTMENT, EMPTY_TITLE_SELECTION, EMPTY_TOC_SELECTION } from './types'
+import type { TitleSelection, TocSelection } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
 const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', 'タイトルの設定', '目次の作成', '詳細＆書き出し'] as const
+const EXPORT_STEP = STEPS.length - 1
 
 export function App() {
   const book = useBook()
   const selectedPage = book.pages.find((p) => p.id === book.selectedPageId)
   const [step, setStep] = useState(0)
   const [maxStep, setMaxStep] = useState(0)
+  // 実際に開いた工程。スキップで飛び越えた工程は、選べても「済」には見せない。
+  const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set([0]))
+  // 書き出し工程の「戻る」の行き先。スキップで来たなら、飛ばした工程ではなく来た工程へ戻す。
+  const [exportBackStep, setExportBackStep] = useState(4)
   // ページが削除・結合・取り消しされたら保存済みのOCR結果を読み直させる。
   // 配列そのものを渡すと毎描画で別参照になるため、IDの並びで memo する。
   const pageIds = useMemo(() => book.pages.map((p) => p.id), [book.pages])
   const ocr = useOcr(book.getStore, { pageIds })
   const chapters = useChapters(book.getStore, { pageIds })
 
+  // タイトル候補・目次ページの選択は、工程を離れて戻っても消えないようここで持つ。
+  const [titleSelection, setTitleSelection] = useState<TitleSelection>(EMPTY_TITLE_SELECTION)
+  const [tocSelectionState, setTocSelection] = useState<TocSelection>(EMPTY_TOC_SELECTION)
+  // 削除・結合で消えたページは目次ページの選択から外す。
+  const tocSelection = useMemo(
+    () => ({
+      ...tocSelectionState,
+      tocPageIds: tocSelectionState.tocPageIds.filter((id) => pageIds.includes(id)),
+    }),
+    [tocSelectionState, pageIds],
+  )
+
   const error = book.error ?? chapters.error
 
   function goTo(next: number) {
+    if (next === EXPORT_STEP && step !== EXPORT_STEP) setExportBackStep(step)
     setStep(next)
     setMaxStep((current) => Math.max(current, next))
+    setVisited((current) => (current.has(next) ? current : new Set(current).add(next)))
   }
 
   // 「並べ替え・調整」「OCR確認・修正」工程に入ったとき、まだ何も選ばれていなければ
@@ -57,6 +77,7 @@ export function App() {
         error: book.error,
         importProgress: book.importProgress,
         canUndoClearAll: book.canUndoClearAll,
+        lastBulkAdjust: book.lastBulkAdjust,
         ocr: {
           running: ocr.running,
           progress: ocr.progress,
@@ -91,6 +112,7 @@ export function App() {
       applyQualityToAllPages: book.applyQualityToAllPages,
       applyToneToAllPages: book.applyToneToAllPages,
       autoAdjustAllPages: book.autoAdjustAllPages,
+      undoBulkAdjust: book.undoBulkAdjust,
       reorderPages: book.reorderPages,
       deletePage: book.deletePage,
       clearAllPages: book.clearAllPages,
@@ -133,9 +155,11 @@ export function App() {
                   className={
                     isActive
                       ? 'step step--active'
-                      : isReachable
-                        ? 'step step--done'
-                        : 'step step--disabled'
+                      : !isReachable
+                        ? 'step step--disabled'
+                        : visited.has(index)
+                          ? 'step step--done'
+                          : 'step step--skipped'
                   }
                   onClick={() => isReachable && goTo(index)}
                 >
@@ -175,9 +199,10 @@ export function App() {
                 <button type="button" className="btn btn-primary" onClick={() => goTo(3)}>
                   タイトルの設定へ進む
                 </button>
-                {/* 目次の作成も任意工程。既存の章立ては消さずに書き出しへ進む。 */}
+                {/* タイトル・目次の設定も任意工程(タイトルは書き出し工程でも入力できる)。
+                    既存の章立ては消さずに書き出しへ進む。 */}
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(5)}>
-                  目次の作成をスキップして書き出しへ
+                  タイトル・目次の設定をスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
                   戻る
@@ -205,8 +230,8 @@ export function App() {
               </>
             )}
             {step === 5 && (
-              <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
-                目次の作成へ戻る
+              <button type="button" className="btn btn-ghost" onClick={() => goTo(exportBackStep)}>
+                {STEPS[exportBackStep]}へ戻る
               </button>
             )}
           </div>
@@ -252,6 +277,8 @@ export function App() {
                         onApplyQualityToAllPages={() => book.applyQualityToAllPages(selectedPage.id)}
                         onApplyToneToAllPages={() => book.applyToneToAllPages(selectedPage.id)}
                         onAutoAdjustAllPages={() => book.autoAdjustAllPages()}
+                        lastBulkAdjust={book.lastBulkAdjust}
+                        onUndoBulkAdjust={() => void book.undoBulkAdjust()}
                       />
                     ) : (
                       // 画素の準備が整うまでの繋ぎ。ここでエディタごと消すと、ページを
@@ -290,6 +317,8 @@ export function App() {
               metadata={book.metadata}
               onChange={book.setMetadata}
               getPagePreview={book.getPagePreview}
+              selection={titleSelection}
+              onSelectionChange={setTitleSelection}
             />
           )}
 
@@ -306,6 +335,8 @@ export function App() {
               onUpdateOcrLine={(pageId, lineId, text) => void ocr.updateLine(pageId, lineId, text)}
               onDeleteOcrLine={(pageId, lineId) => void ocr.deleteLine(pageId, lineId)}
               onMoveOcrLine={(pageId, lineId, toIndex) => void ocr.moveLine(pageId, lineId, toIndex)}
+              tocSelection={tocSelection}
+              onTocSelectionChange={setTocSelection}
             />
           )}
 

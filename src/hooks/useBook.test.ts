@@ -321,6 +321,79 @@ describe('useBook', () => {
     expect(request.pages[0].adjustment).toEqual({ brightness: 30, contrast: 0 })
   })
 
+  // 「他のページにも適用」「全ページを自動補正」は全ページの値を上書きするので、
+  // 直前の一括操作を1回だけ取り消せる。
+  it('undoes the last bulk adjustment, restoring each page’s previous values in the store too', async () => {
+    const view = await importPages([
+      imageFile('a.png', [10, 20, 30, 255]),
+      imageFile('b.png', [40, 50, 60, 255]),
+    ])
+    const [a, b] = view.result.current.pages.map((p) => p.id)
+    await act(async () => {
+      await view.result.current.updateAdjustment(b, { brightness: 5, contrast: 7 })
+      await view.result.current.updateAdjustment(a, { brightness: 40, contrast: -10 })
+    })
+    expect(view.result.current.lastBulkAdjust).toBeNull()
+
+    await act(async () => {
+      await view.result.current.applyToneToAllPages(a)
+    })
+    expect(view.result.current.pages.find((p) => p.id === b)!.adjustment).toMatchObject({
+      brightness: 40,
+      contrast: -10,
+    })
+    expect(view.result.current.lastBulkAdjust).toBe('明るさ・コントラストを他のページに適用')
+
+    await act(async () => {
+      await view.result.current.undoBulkAdjust()
+    })
+    expect(view.result.current.pages.find((p) => p.id === b)!.adjustment).toMatchObject({
+      brightness: 5,
+      contrast: 7,
+    })
+    expect(view.result.current.lastBulkAdjust).toBeNull()
+
+    // 取り消しは IndexedDB にも反映されている(再読み込み後も元の値)。
+    view.unmount()
+    const reloaded = renderHook(() => useBook())
+    await waitFor(() => expect(reloaded.result.current.pages).toHaveLength(2))
+    expect(reloaded.result.current.pages.find((p) => p.id === b)!.adjustment).toMatchObject({
+      brightness: 5,
+      contrast: 7,
+    })
+  })
+
+  it('offers undo for auto-adjusting all pages', async () => {
+    const view = await importPages([imageFile('a.png', [10, 20, 30, 255])])
+    const [a] = view.result.current.pages.map((p) => p.id)
+    await act(async () => {
+      await view.result.current.updateAdjustment(a, { brightness: 3, contrast: 4 })
+      await view.result.current.autoAdjustAllPages()
+    })
+    expect(view.result.current.lastBulkAdjust).toBe('全ページを自動補正')
+    await act(async () => {
+      await view.result.current.undoBulkAdjust()
+    })
+    expect(view.result.current.pages[0].adjustment).toMatchObject({ brightness: 3, contrast: 4 })
+  })
+
+  // 一括操作のあとに個別に調整したら、取り消しで個別の調整まで巻き戻さないよう取り消しを失効させる。
+  it('drops the bulk undo once a page is adjusted individually', async () => {
+    const view = await importPages([
+      imageFile('a.png', [10, 20, 30, 255]),
+      imageFile('b.png', [40, 50, 60, 255]),
+    ])
+    const [a] = view.result.current.pages.map((p) => p.id)
+    await act(async () => {
+      await view.result.current.applyQualityToAllPages(a)
+    })
+    expect(view.result.current.lastBulkAdjust).toBe('画質を他のページに適用')
+    await act(async () => {
+      await view.result.current.updateAdjustment(a, { brightness: 1, contrast: 0 })
+    })
+    expect(view.result.current.lastBulkAdjust).toBeNull()
+  })
+
   it('sends stored blobs, not decoded pixels, to the export worker', async () => {
     const view = await importPages([imageFile('a.png', [10, 20, 30, 255])])
     await act(async () => {

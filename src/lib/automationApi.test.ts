@@ -12,6 +12,7 @@ function fakeApi(overrides: Partial<Omit<AutomationApi, 'describe'>> = {}): Omit
       error: null,
       importProgress: null,
       canUndoClearAll: false,
+      lastBulkAdjust: null,
       ocr: { running: false, progress: null, concurrency: 2, maxConcurrency: 7 },
       chapters: [],
     })),
@@ -33,6 +34,7 @@ function fakeApi(overrides: Partial<Omit<AutomationApi, 'describe'>> = {}): Omit
     applyQualityToAllPages: vi.fn(),
     applyToneToAllPages: vi.fn(),
     autoAdjustAllPages: vi.fn(),
+    undoBulkAdjust: vi.fn(),
     reorderPages: vi.fn(),
     deletePage: vi.fn(),
     clearAllPages: vi.fn(),
@@ -59,6 +61,14 @@ describe('installAutomationApi', () => {
     const methods = window.EbookMaker?.describe().methods
     expect(methods?.getOcrConcurrency).toMatch(/同時処理数/)
     expect(methods?.setOcrConcurrency).toMatch(/同時処理数/)
+  })
+
+  it('exposes undoBulkAdjust and documents it', () => {
+    const api = fakeApi()
+    installAutomationApi(api)
+    void window.EbookMaker?.undoBulkAdjust()
+    expect(api.undoBulkAdjust).toHaveBeenCalled()
+    expect(window.EbookMaker?.describe().methods.undoBulkAdjust).toMatch(/取り消す/)
   })
 
   it('exposes the given operations on window.EbookMaker', () => {

@@ -21,6 +21,8 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     applyQualityToAllPages: vi.fn(),
     applyToneToAllPages: vi.fn(),
     autoAdjustAllPages: vi.fn(),
+    lastBulkAdjust: null,
+    undoBulkAdjust: vi.fn(),
     reorderPages: vi.fn(),
     deletePage: vi.fn(),
     confirmMerge: vi.fn(),
@@ -102,15 +104,16 @@ describe('App', () => {
     expect(screen.getByText('書き出し')).toBeInTheDocument()
   })
 
-  // 目次の作成も任意工程。OCR確認から直接書き出しへ進める。
-  it('lets the user skip the 目次の作成 step', () => {
+  // タイトル・目次の設定も任意工程。OCR確認から直接書き出しへ進める。
+  // (タイトルは書き出し工程でも入力できる。文言は飛ばす工程を正しく名指しする)
+  it('lets the user skip the タイトル・目次 steps', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
-    fireEvent.click(screen.getByText('目次の作成をスキップして書き出しへ'))
+    fireEvent.click(screen.getByText('タイトル・目次の設定をスキップして書き出しへ'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
     expect(screen.queryByText('章を追加')).not.toBeInTheDocument()
   })
@@ -141,6 +144,49 @@ describe('App', () => {
     expect(screen.getByText('章を追加')).toBeInTheDocument()
   })
 
+  // 書き出しの「戻る」は、飛ばしてきた工程ではなく来た工程へ戻す。
+  it('returns from 書き出し to 並べ替え・調整 when OCR was skipped', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRをスキップして書き出しへ'))
+    expect(screen.queryByText('目次の作成へ戻る')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('並べ替え・調整へ戻る'))
+    expect(screen.getByText('見開き結合')).toBeInTheDocument()
+  })
+
+  it('returns from 書き出し to OCR確認・修正 when the タイトル・目次 steps were skipped', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('タイトル・目次の設定をスキップして書き出しへ'))
+    fireEvent.click(screen.getByText('OCR確認・修正へ戻る'))
+    expect(screen.getByText('このページをOCR')).toBeInTheDocument()
+  })
+
+  // 飛ばした工程は「済」に見せない。ただし後から戻って作業できるよう、選べるままにする。
+  it('marks skipped steps as skipped, not done, while keeping them reachable', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRをスキップして書き出しへ'))
+    const railStep = (label: string) => screen.getByText(label, { selector: '.rail span' }).closest('.step')!
+    expect(railStep('並べ替え・調整')).toHaveClass('step--done')
+    for (const label of ['OCR確認・修正', 'タイトルの設定', '目次の作成']) {
+      expect(railStep(label)).toHaveClass('step--skipped')
+      expect(railStep(label)).not.toHaveClass('step--done')
+    }
+    fireEvent.click(railStep('目次の作成'))
+    expect(screen.getByText('章を追加')).toBeInTheDocument()
+  })
+
   it('shows the AdjustmentEditor on the 並べ替え・調整 step once a page is selected and its image is loaded', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({
@@ -153,6 +199,21 @@ describe('App', () => {
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     expect(screen.getByTestId('brightness-slider')).toHaveValue('5')
+  })
+
+  it('lets the user undo the last bulk adjustment from the 並べ替え・調整 step', () => {
+    const props = mockBook({
+      pages: [page],
+      thumbnails: { a: 'blob:a' },
+      selectedPageId: 'a',
+      selectedImage: { data: new Uint8ClampedArray(16), width: 2, height: 2 },
+      lastBulkAdjust: '全ページを自動補正',
+    })
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(props)
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByRole('button', { name: '「全ページを自動補正」を取り消す' }))
+    expect(props.undoBulkAdjust).toHaveBeenCalled()
   })
 
   it('shows a placeholder, not another page’s image, while the preview decodes', () => {

@@ -49,6 +49,35 @@ export interface Chapter {
   level: number
 }
 
+/** 目次ページの選択と本文の開始位置。工程を離れて戻っても消えないよう、App側で持つ。 */
+export interface TocSelection {
+  tocPageIds: string[]
+  /** 画像の何枚目が印刷ページ1か(1始まり)。 */
+  bodyStart: number
+  /** ユーザーが本文の開始位置を直したか。直したあとは目次ページに合わせて動かさない。 */
+  bodyStartEdited: boolean
+}
+
+export const EMPTY_TOC_SELECTION: TocSelection = { tocPageIds: [], bodyStart: 1, bodyStartEdited: false }
+
+/**
+ * どのOCR行をタイトル/著者に含めるか、と自動入力済みのOCR結果。工程を離れて
+ * 戻っても消えないよう、App側で持つ。改行でbboxが分かれた行を複数選んで結合
+ * できるよう、テキストの完全一致ではなく行IDで持つ。
+ */
+export interface TitleSelection {
+  titleLineIds: readonly string[]
+  authorLineIds: readonly string[]
+  /** 自動入力に使ったOCR結果の updatedAt。同じ結果で二度自動入力しないために使う。 */
+  appliedOcrKey: number | null
+}
+
+export const EMPTY_TITLE_SELECTION: TitleSelection = {
+  titleLineIds: [],
+  authorLineIds: [],
+  appliedOcrKey: null,
+}
+
 // 書き出し用に、章を書き出し順のページindex(0始まり)へ変換したもの。
 export interface ExportChapter {
   title: string

@@ -30,6 +30,10 @@ export interface UseBookResult {
   applyQualityToAllPages: (sourceId: string) => Promise<void>
   applyToneToAllPages: (sourceId: string) => Promise<void>
   autoAdjustAllPages: () => Promise<void>
+  /** 取り消せる直前の一括調整の名前(なければ null)。 */
+  lastBulkAdjust: string | null
+  /** 直前の一括調整の前の値に全ページを戻す。 */
+  undoBulkAdjust: () => Promise<void>
   reorderPages: (orderedIds: string[]) => Promise<void>
   deletePage: (id: string) => Promise<void>
   clearAllPages: () => Promise<void>
@@ -96,6 +100,11 @@ export function useBook(): UseBookResult {
     ocr: OcrResult[]
     chapters: Chapter[]
   } | null>(null)
+
+  // 一括調整(他のページにも適用・全ページを自動補正)の直前の各ページの値。
+  // 全ページを上書きする操作なので、1回だけ取り消せるようにしておく。
+  const [lastBulkAdjust, setLastBulkAdjust] = useState<string | null>(null)
+  const bulkAdjustSnapshotRef = useRef<Map<string, AdjustmentParams> | null>(null)
 
   const clearError = useCallback(() => setError(null), [])
 
@@ -403,6 +412,9 @@ export function useBook(): UseBookResult {
   // 入力イベントごとではなく確定時の保存を求めている。以前は1目盛ごとに
   // 書き込んでページ表全体を読み直しており、実物のスキャンではUIが固まっていた。
   const updateAdjustment = useCallback(async (id: string, adjustment: AdjustmentParams) => {
+    // 一括操作のあとの個別調整を、取り消しで巻き戻さないよう失効させる。
+    bulkAdjustSnapshotRef.current = null
+    setLastBulkAdjust(null)
     setPages((current) => current.map((p) => (p.id === id ? { ...p, adjustment } : p)))
     const pending = pendingAdjustmentsRef.current
     const existing = pending.get(id)
@@ -417,6 +429,28 @@ export function useBook(): UseBookResult {
     pending.set(id, { timer, adjustment })
   }, [])
 
+  // 一括調整の前に呼び、全ページの現在の値を取り消し用に控える。
+  const snapshotBeforeBulkAdjust = useCallback(async (store: ImageStore, label: string) => {
+    const current = await store.listPages()
+    bulkAdjustSnapshotRef.current = new Map(current.map((p) => [p.id, p.adjustment]))
+    setLastBulkAdjust(label)
+  }, [])
+
+  const undoBulkAdjust = useCallback(async () => {
+    const store = storeRef.current
+    const snapshot = bulkAdjustSnapshotRef.current
+    if (!store || !snapshot) return
+    bulkAdjustSnapshotRef.current = null
+    setLastBulkAdjust(null)
+    await flushPendingAdjustments()
+    // 一括操作のあとで削除・結合されたページは戻しようがないので飛ばす。
+    for (const page of await store.listPages()) {
+      const previous = snapshot.get(page.id)
+      if (previous) await store.updateAdjustment(page.id, previous)
+    }
+    await refreshPages()
+  }, [flushPendingAdjustments, refreshPages])
+
   // リサイズ設定だけを他のページにも複製する。明るさ・コントラスト・画質は
   // ページごとに個別の値を持っているため、ここでは触れない
   // (以前はここで調整値全体をコピーしており、リサイズを揃えるだけのつもりが
@@ -429,13 +463,14 @@ export function useBook(): UseBookResult {
       const source = pages.find((p) => p.id === sourceId)
       if (!source) return
       const { resizeMode, resizeWidth, resizeHeight } = source.adjustment
+      await snapshotBeforeBulkAdjust(store, 'リサイズを他のページに適用')
       for (const page of pages) {
         if (page.id === sourceId) continue
         await store.updateAdjustment(page.id, { ...page.adjustment, resizeMode, resizeWidth, resizeHeight })
       }
       await refreshPages()
     },
-    [pages, refreshPages, flushPendingAdjustments],
+    [pages, refreshPages, flushPendingAdjustments, snapshotBeforeBulkAdjust],
   )
 
   // 画質だけを他のページにも複製する。
@@ -447,13 +482,14 @@ export function useBook(): UseBookResult {
       const source = pages.find((p) => p.id === sourceId)
       if (!source) return
       const { quality } = source.adjustment
+      await snapshotBeforeBulkAdjust(store, '画質を他のページに適用')
       for (const page of pages) {
         if (page.id === sourceId) continue
         await store.updateAdjustment(page.id, { ...page.adjustment, quality })
       }
       await refreshPages()
     },
-    [pages, refreshPages, flushPendingAdjustments],
+    [pages, refreshPages, flushPendingAdjustments, snapshotBeforeBulkAdjust],
   )
 
   // 明るさ・コントラストだけを他のページにも複製する。
@@ -465,19 +501,21 @@ export function useBook(): UseBookResult {
       const source = pages.find((p) => p.id === sourceId)
       if (!source) return
       const { brightness, contrast } = source.adjustment
+      await snapshotBeforeBulkAdjust(store, '明るさ・コントラストを他のページに適用')
       for (const page of pages) {
         if (page.id === sourceId) continue
         await store.updateAdjustment(page.id, { ...page.adjustment, brightness, contrast })
       }
       await refreshPages()
     },
-    [pages, refreshPages, flushPendingAdjustments],
+    [pages, refreshPages, flushPendingAdjustments, snapshotBeforeBulkAdjust],
   )
 
   const autoAdjustAllPages = useCallback(async () => {
     const store = storeRef.current
     if (!store) return
     await flushPendingAdjustments()
+    await snapshotBeforeBulkAdjust(store, '全ページを自動補正')
     const currentPages = await store.listPages()
     for (const page of currentPages) {
       if (!page.thumbBlobId) continue
@@ -488,7 +526,7 @@ export function useBook(): UseBookResult {
       await store.updateAdjustment(page.id, { ...page.adjustment, ...auto })
     }
     await refreshPages()
-  }, [flushPendingAdjustments, refreshPages])
+  }, [flushPendingAdjustments, refreshPages, snapshotBeforeBulkAdjust])
 
   const reorderPages = useCallback(
     async (orderedIds: string[]) => {
@@ -683,6 +721,8 @@ export function useBook(): UseBookResult {
     applyQualityToAllPages,
     applyToneToAllPages,
     autoAdjustAllPages,
+    lastBulkAdjust,
+    undoBulkAdjust,
     reorderPages,
     deletePage,
     clearAllPages,

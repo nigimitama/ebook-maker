@@ -238,6 +238,11 @@ label {
   color: var(--color-accent-strong);
 }
 
+/* スキップで飛び越えた工程。戻って作業できるので選べるが、「済」の色にはしない。 */
+.step--skipped {
+  cursor: pointer;
+}
+
 .step--disabled {
   cursor: default;
   opacity: 0.5;
@@ -609,6 +614,15 @@ label {
   display: flex;
   gap: 16px;
   margin-bottom: 12px;
+}
+
+.export-panel__option {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.export-panel__actions {
+  margin-top: 4px;
 }
 
 .export-panel__error {
