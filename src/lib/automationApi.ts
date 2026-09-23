@@ -20,6 +20,8 @@ export interface AutomationState {
   error: string | null
   importProgress: { done: number; total: number } | null
   canUndoClearAll: boolean
+  /** undoBulkAdjust で取り消せる直前の一括調整の名前(なければ null)。 */
+  lastBulkAdjust: string | null
   ocr: {
     running: boolean
     progress: OcrProgress | null
@@ -51,6 +53,7 @@ export interface AutomationApi {
   applyQualityToAllPages: (sourceId: string) => Promise<void>
   applyToneToAllPages: (sourceId: string) => Promise<void>
   autoAdjustAllPages: () => Promise<void>
+  undoBulkAdjust: () => Promise<void>
   reorderPages: (orderedIds: string[]) => Promise<void>
   deletePage: (id: string) => Promise<void>
   clearAllPages: () => Promise<void>
@@ -89,6 +92,7 @@ const API_DESCRIPTION: AutomationApiDescription = {
     applyQualityToAllPages: '(sourceId: string) => Promise<void> — 指定ページの画質設定を全ページに複製する。',
     applyToneToAllPages: '(sourceId: string) => Promise<void> — 指定ページの明るさ・コントラストを全ページに複製する。',
     autoAdjustAllPages: '() => Promise<void> — 全ページに自動補正をかける。',
+    undoBulkAdjust: '() => Promise<void> — 直前の一括調整(apply*ToAllPages / autoAdjustAllPages)を取り消す(各ページを元の値に戻す)。取り消せるのは getState().lastBulkAdjust が null でないときだけ(個別の updateAdjustment で失効する)。',
     reorderPages: '(orderedIds: string[]) => Promise<void> — ページの並び順を変更する。',
     deletePage: '(id: string) => Promise<void> — ページを削除する。',
     clearAllPages: '() => Promise<void> — 全ページを削除する(undoClearAllで取り消し可能)。',

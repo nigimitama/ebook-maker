@@ -74,6 +74,14 @@ export function ChaptersStep({
   const [bodyStart, setBodyStart] = useState(1) // 画像の何枚目が印刷ページ1か(1始まり)
   const [bodyStartEdited, setBodyStartEdited] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
+  // 解析での置き換え・章の削除の直前の章立て。手で直した内容が消える操作なので、
+  // 直後に1回だけ取り消せるようにする。ほかの編集をしたら失効させる。
+  const [undo, setUndo] = useState<{ label: string; message: string; chapters: Chapter[] } | null>(null)
+
+  function commit(next: Chapter[]) {
+    setUndo(null)
+    onChange(next)
+  }
   // サムネイルは小さく読みにくいので、クリックで拡大表示するモーダルを出す
   // (並べ替えページのZoomModal/AdjustedPreviewを流用)。サムネイルをそのまま
   // 引き延ばすと荒くなるため、開いたタイミングで原本から高精細プレビューを取得する。
@@ -134,19 +142,24 @@ export function ChaptersStep({
       return
     }
     setNotice(null)
+    setUndo(
+      chapters.length > 0
+        ? { label: '目次の置き換え', message: '目次を解析結果で置き換えました', chapters }
+        : null,
+    )
     onChange(sortChapters(parsed, pageIds))
   }
 
   function updateChapter(id: string, patch: Partial<Chapter>, resort = false) {
     const next = chapters.map((c) => (c.id === id ? { ...c, ...patch } : c))
-    onChange(resort ? sortChapters(next, pageIds) : next)
+    commit(resort ? sortChapters(next, pageIds) : next)
   }
 
   function addChapter() {
     const last = chapters[chapters.length - 1]
     const pageId = last?.pageId ?? pageIds[0]
     if (!pageId) return
-    onChange([...chapters, { id: newChapterId(), title: '', pageId, level: 1 }])
+    commit([...chapters, { id: newChapterId(), title: '', pageId, level: 1 }])
   }
 
   const unscanned = detection.unscannedPageIds
@@ -230,6 +243,22 @@ export function ChaptersStep({
 
       <div className="panel">
         <h2>目次</h2>
+        {undo && (
+          <p className="chapters-step__undo" role="status">
+            <span>{undo.message}</span>{' '}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              aria-label={`「${undo.label}」を取り消す`}
+              onClick={() => {
+                setUndo(null)
+                onChange(undo.chapters)
+              }}
+            >
+              元に戻す
+            </button>
+          </p>
+        )}
         {chapters.length === 0 && <p>目次はまだありません。目次を解析するか、手で追加してください。</p>}
         {chapters.map((chapter, i) => (
           <div key={chapter.id} className="chapters-step__row">
@@ -272,7 +301,14 @@ export function ChaptersStep({
               type="button"
               className="btn btn-ghost"
               aria-label={`章${i + 1}を削除`}
-              onClick={() => onChange(chapters.filter((c) => c.id !== chapter.id))}
+              onClick={() => {
+                setUndo({
+                  label: '章の削除',
+                  message: `「${chapter.title || `章${i + 1}`}」を削除しました`,
+                  chapters,
+                })
+                onChange(chapters.filter((c) => c.id !== chapter.id))
+              }}
             >
               削除
             </button>

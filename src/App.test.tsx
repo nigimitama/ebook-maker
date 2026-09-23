@@ -21,6 +21,8 @@ function mockBook(overrides: Partial<UseBookResult> = {}): UseBookResult {
     applyQualityToAllPages: vi.fn(),
     applyToneToAllPages: vi.fn(),
     autoAdjustAllPages: vi.fn(),
+    lastBulkAdjust: null,
+    undoBulkAdjust: vi.fn(),
     reorderPages: vi.fn(),
     deletePage: vi.fn(),
     confirmMerge: vi.fn(),
@@ -197,6 +199,21 @@ describe('App', () => {
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     expect(screen.getByTestId('brightness-slider')).toHaveValue('5')
+  })
+
+  it('lets the user undo the last bulk adjustment from the 並べ替え・調整 step', () => {
+    const props = mockBook({
+      pages: [page],
+      thumbnails: { a: 'blob:a' },
+      selectedPageId: 'a',
+      selectedImage: { data: new Uint8ClampedArray(16), width: 2, height: 2 },
+      lastBulkAdjust: '全ページを自動補正',
+    })
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(props)
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByRole('button', { name: '「全ページを自動補正」を取り消す' }))
+    expect(props.undoBulkAdjust).toHaveBeenCalled()
   })
 
   it('shows a placeholder, not another page’s image, while the preview decodes', () => {

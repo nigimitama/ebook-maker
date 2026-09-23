@@ -201,4 +201,26 @@ describe('AdjustmentEditor', () => {
       expect.objectContaining({ brightness: 0, contrast: 0, quality: 40 }),
     )
   })
+
+  // 一括操作は全ページを上書きするので、直後にその場で取り消せるようにする。
+  it('offers to undo the last bulk adjustment by name', () => {
+    const onUndoBulkAdjust = vi.fn()
+    const props = {
+      image: image(),
+      adjustment: { brightness: 0, contrast: 0 },
+      onAdjustmentChange: vi.fn(),
+      onApplyResizeToAllPages: vi.fn(),
+      onApplyQualityToAllPages: vi.fn(),
+      onApplyToneToAllPages: vi.fn(),
+      onAutoAdjustAllPages: vi.fn(),
+      onUndoBulkAdjust,
+    }
+    const { rerender } = render(<AdjustmentEditor {...props} lastBulkAdjust={null} />)
+    expect(screen.queryByRole('button', { name: /を取り消す/ })).not.toBeInTheDocument()
+
+    rerender(<AdjustmentEditor {...props} lastBulkAdjust="全ページを自動補正" />)
+    expect(screen.getByRole('status')).toHaveTextContent('全ページを自動補正しました')
+    fireEvent.click(screen.getByRole('button', { name: '「全ページを自動補正」を取り消す' }))
+    expect(onUndoBulkAdjust).toHaveBeenCalled()
+  })
 })

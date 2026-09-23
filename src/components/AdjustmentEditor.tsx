@@ -11,6 +11,9 @@ interface AdjustmentEditorProps {
   onApplyQualityToAllPages: () => void
   onApplyToneToAllPages: () => void
   onAutoAdjustAllPages: () => void
+  /** 取り消せる直前の一括調整の名前(なければ null)。 */
+  lastBulkAdjust?: string | null
+  onUndoBulkAdjust?: () => void
 }
 
 export function AdjustmentEditor({
@@ -21,6 +24,8 @@ export function AdjustmentEditor({
   onApplyQualityToAllPages,
   onApplyToneToAllPages,
   onAutoAdjustAllPages,
+  lastBulkAdjust = null,
+  onUndoBulkAdjust,
 }: AdjustmentEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const resizeMode = adjustment.resizeMode ?? 'none'
@@ -50,6 +55,19 @@ export function AdjustmentEditor({
         data-testid="adjustment-canvas"
         className="adjustment-editor__canvas"
       />
+      {lastBulkAdjust && onUndoBulkAdjust && (
+        <div className="adjustment-editor__undo" role="status">
+          <span>{lastBulkAdjust}しました</span>
+          <button
+            type="button"
+            className="btn-ghost"
+            aria-label={`「${lastBulkAdjust}」を取り消す`}
+            onClick={onUndoBulkAdjust}
+          >
+            元に戻す
+          </button>
+        </div>
+      )}
       <div className="adjustment-editor__controls">
         <fieldset className="adjustment-editor__tone">
           <legend>明るさ・コントラスト</legend>

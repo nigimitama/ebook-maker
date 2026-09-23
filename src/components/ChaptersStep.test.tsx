@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { ChaptersStep, type ChaptersStepProps } from './ChaptersStep'
@@ -60,7 +61,65 @@ function setup(overrides: Partial<ChaptersStepProps> = {}) {
   return props
 }
 
+// 章の変更を実際に反映させるため、chapters を状態として持つ親の代わり。
+function StatefulChaptersStep({ initial, ...rest }: Omit<ChaptersStepProps, 'chapters' | 'onChange'> & { initial: Chapter[] }) {
+  const [chapters, setChapters] = useState(initial)
+  return <ChaptersStep {...rest} chapters={chapters} onChange={setChapters} />
+}
+
+function setupStateful(initial: Chapter[]) {
+  render(
+    <StatefulChaptersStep
+      initial={initial}
+      pages={pages}
+      thumbnails={thumbnails}
+      ocrResults={{ p1: ocr('p1', tocTexts), p2: ocr('p2', ['本文']), p3: ocr('p3', ['本文']) }}
+      ocrRunning={false}
+      onRunOcr={vi.fn()}
+      getPagePreview={vi.fn(async () => rawImage())}
+      onUpdateOcrLine={vi.fn()}
+      onDeleteOcrLine={vi.fn()}
+      onMoveOcrLine={vi.fn()}
+    />,
+  )
+}
+
+const handMade: Chapter[] = [
+  { id: 'c1', title: '手で直した章', pageId: 'p2', level: 1 },
+  { id: 'c2', title: '別の章', pageId: 'p5', level: 1 },
+]
+
+const titles = () =>
+  screen.queryAllByRole('textbox', { name: /章\d+のタイトル/ }).map((el) => (el as HTMLInputElement).value)
+
 describe('ChaptersStep', () => {
+  // 解析で置き換えると手で直した章立てが消えるので、直後に取り消せるようにする。
+  it('undoes replacing the chapters with a fresh parse', () => {
+    setupStateful(handMade)
+    fireEvent.click(screen.getByText('目次を解析して置き換える'))
+    expect(titles()).toContain('第2章 手法')
+    fireEvent.click(screen.getByRole('button', { name: '「目次の置き換え」を取り消す' }))
+    expect(titles()).toEqual(['手で直した章', '別の章'])
+    expect(screen.queryByRole('button', { name: /を取り消す/ })).not.toBeInTheDocument()
+  })
+
+  it('undoes deleting a chapter', () => {
+    setupStateful(handMade)
+    fireEvent.click(screen.getByLabelText('章1を削除'))
+    expect(titles()).toEqual(['別の章'])
+    expect(screen.getByRole('status')).toHaveTextContent('「手で直した章」を削除しました')
+    fireEvent.click(screen.getByRole('button', { name: '「章の削除」を取り消す' }))
+    expect(titles()).toEqual(['手で直した章', '別の章'])
+  })
+
+  // 取り消しのあとに加えた編集を巻き戻さないよう、ほかの編集をしたら取り消しは消える。
+  it('drops the undo once the chapters are edited again', () => {
+    setupStateful(handMade)
+    fireEvent.click(screen.getByLabelText('章1を削除'))
+    fireEvent.change(screen.getByLabelText('章1のタイトル'), { target: { value: '改題' } })
+    expect(screen.queryByRole('button', { name: /を取り消す/ })).not.toBeInTheDocument()
+  })
+
   it('auto-detects the toc page on open and parses it into chapters', () => {
     const props = setup()
     expect(screen.getByLabelText('1枚目を目次ページにする')).toBeChecked()

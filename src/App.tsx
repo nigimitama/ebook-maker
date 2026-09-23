@@ -64,6 +64,7 @@ export function App() {
         error: book.error,
         importProgress: book.importProgress,
         canUndoClearAll: book.canUndoClearAll,
+        lastBulkAdjust: book.lastBulkAdjust,
         ocr: {
           running: ocr.running,
           progress: ocr.progress,
@@ -98,6 +99,7 @@ export function App() {
       applyQualityToAllPages: book.applyQualityToAllPages,
       applyToneToAllPages: book.applyToneToAllPages,
       autoAdjustAllPages: book.autoAdjustAllPages,
+      undoBulkAdjust: book.undoBulkAdjust,
       reorderPages: book.reorderPages,
       deletePage: book.deletePage,
       clearAllPages: book.clearAllPages,
@@ -262,6 +264,8 @@ export function App() {
                         onApplyQualityToAllPages={() => book.applyQualityToAllPages(selectedPage.id)}
                         onApplyToneToAllPages={() => book.applyToneToAllPages(selectedPage.id)}
                         onAutoAdjustAllPages={() => book.autoAdjustAllPages()}
+                        lastBulkAdjust={book.lastBulkAdjust}
+                        onUndoBulkAdjust={() => void book.undoBulkAdjust()}
                       />
                     ) : (
                       // 画素の準備が整うまでの繋ぎ。ここでエディタごと消すと、ページを
