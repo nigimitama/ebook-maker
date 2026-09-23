@@ -43,6 +43,18 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
     setDownload(null)
   }
 
+  // リンクだと本文中のテキストに見えて気づきにくいので、ボタンから一時的な
+  // リンクを踏ませて保存する。URLは結果の差し替え・破棄まで保持する(上のeffect)。
+  function saveDownload() {
+    if (!download) return
+    const a = document.createElement('a')
+    a.href = download.url
+    a.download = `${title && sanitizeFileName(title) ? sanitizeFileName(title) : 'book'}.${download.format}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+  }
+
   async function handleExport() {
     setStatus('running')
     setErrorMessage(null)
@@ -128,13 +140,11 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
         </p>
       )}
       {status === 'done' && download && (
-        <a
-          href={download.url}
-          download={`${title && sanitizeFileName(title) ? sanitizeFileName(title) : 'book'}.${download.format}`}
-          data-testid="download-link"
-        >
-          ダウンロード
-        </a>
+        <div className="export-panel__actions">
+          <button type="button" className="btn btn-primary" onClick={saveDownload}>
+            ダウンロード
+          </button>
+        </div>
       )}
     </div>
   )

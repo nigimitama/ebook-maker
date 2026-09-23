@@ -77,7 +77,7 @@ test('export keeps the original resolution despite downscaled previews', async (
   await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByTestId('download-link').click(),
+    page.getByRole('button', { name: 'ダウンロード' }).click(),
   ])
   const downloadPath = await download.path()
   const { PDFDocument } = await import('pdf-lib')

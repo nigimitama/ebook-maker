@@ -48,7 +48,7 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByTestId('download-link').click(),
+    page.getByRole('button', { name: 'ダウンロード' }).click(),
   ])
   const downloadPath = await download.path()
   expect(downloadPath).not.toBeNull()
@@ -74,7 +74,7 @@ test('exports an EPUB with one xhtml/image pair per page', async ({ page }) => {
   await page.getByRole('button', { name: '書き出し' }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByTestId('download-link').click(),
+    page.getByRole('button', { name: 'ダウンロード' }).click(),
   ])
   const downloadPath = await download.path()
   const fs = await import('node:fs')
