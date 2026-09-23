@@ -13,7 +13,8 @@
     "preview": "vite preview",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:ocr": "playwright test --config playwright.ocr.config.ts"
   },
   "dependencies": {
     "jszip": "^3.10.1",

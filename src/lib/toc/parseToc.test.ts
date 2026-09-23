@@ -159,6 +159,15 @@ describe('parseTocEntries on transcribed real-looking layouts', () => {
     ])
   })
 
+  it('skips symbol-only rule lines between a title and its page number', () => {
+    expect(parseTocEntries(['習慣と継続の「仕組み化」', '|', '|', '62'])).toEqual([
+      { title: '習慣と継続の「仕組み化」', printedPage: 62, level: 1 },
+    ])
+    expect(parseTocEntries(['第3章 結果と考察', '……', '48'])).toEqual([
+      { title: '第3章 結果と考察', printedPage: 48, level: 1 },
+    ])
+  })
+
   it('extracts every entry from an interleaved two-column list (03_two_column)', () => {
     const entries = parseTocEntries(['1. 概要 3', '7. 学習 41', '2. 環境構築 6', '8. 評価 50'])
     expect(entries.map((e) => [e.title, e.printedPage])).toEqual([
@@ -424,6 +433,53 @@ describe('parseToc on transcribed real-looking layouts', () => {
       ['撤退基準をあらかじめ決めておく', 'b80', 1],
       ['数字よりも先に人を見る', 'b88', 1],
       ['長期と短期の綱引き', 'b95', 1],
+    ])
+  })
+
+  it('09_fontsize_contrast_chapter_preview: 縦書き・章ごとに要約文付きの目次から章名とページ番号を取り出す', () => {
+    const pageIds = bodyPageIds(84)
+    // 読み順は右列→左列。「第」「5」「章」は大きさの違う別々の行、章名の列の下に
+    // 短い罫線(「|」)とページ番号が続き、その後に副題と要約文の列が並ぶ。
+    const results = {
+      toc: result('toc', [
+        '第',
+        '5',
+        '章',
+        '習慣と継続の「仕組み化」',
+        '|',
+        '|',
+        '62',
+        '——成果を出す人が徹底していること',
+        '一流の人は当たり前のことを徹底している/と思ってしまう/自分',
+        'が普通だと思っていることが/実は特別だという事実に/気づいて',
+        'いないだけかもしれない/継続できる人とできない人の違いは/才',
+        '能ではなく仕組みにある/モチベーションに頼らず/自動的に体が',
+        '動く状態を作れるかが/分かれ目になる/小さな習慣を積み重ねる',
+        'ことでしか/大きな変化は起こらない/今日 少しだけ昨日より前',
+        '進する/それだけでいい/完璧を求めすぎると続けることが苦しく',
+        'なる/六割の出来でも続けることを優先する',
+        '第',
+        '6',
+        '章',
+        '選択と集中の「優先順位」',
+        '|',
+        '|',
+        '84',
+        '——限られた時間で最大の成果を出す方法',
+        '選ぶことは同時に/何かを捨てることでもある/すべてを手に入れ',
+        'ようとする人ほど/結局は何も残らない/優先順位をつけられない',
+        'のは/判断基準を持っていないからだ/重要度と緊急度を分けて考',
+        'える/それだけで景色が変わる/限られた時間の中で/最大の成果',
+        'を出す人に共通するのは/「やらないこと」を先に決めている点だ',
+        '/忙しさは成果の証ではない/むしろ優先順位のなさの表れである',
+      ]),
+    }
+    const chapters = parseToc(['toc'], results, pageIds, 1)
+    // 章番号の「5」は単独の数字行なので、断片の「第」とは結び付かずページ番号扱いにもならない
+    // (章名に「第5章」は付かない)。副題・要約文は番号が続かないので章にならない。
+    expect(chapters.map((c) => [c.title, c.pageId, c.level])).toEqual([
+      ['習慣と継続の「仕組み化」', 'b62', 1],
+      ['選択と集中の「優先順位」', 'b84', 1],
     ])
   })
 })
