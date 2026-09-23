@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ProgressBar } from './ProgressBar'
 
 type Format = 'pdf' | 'epub'
@@ -23,19 +23,36 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
   const [embedChapters, setEmbedChapters] = useState(true)
   const [format, setFormat] = useState<Format>('pdf')
   const [status, setStatus] = useState<Status>('idle')
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null)
+  // ファイル名は書き出した時点の形式で付ける(書き出し中に形式を切り替えても食い違わない)。
+  const [download, setDownload] = useState<{ url: string; format: Format } | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null)
+
+  // 書き出したBlobは数百MBになりうるので、差し替え・破棄のたびにURLを解放する。
+  const downloadUrl = download?.url
+  useEffect(() => {
+    if (!downloadUrl) return
+    return () => URL.revokeObjectURL(downloadUrl)
+  }, [downloadUrl])
+
+  // 書き出し後に設定を変えたら、古い結果のリンクは消す。残すと、たとえば
+  // PDFのBlobが .epub の名前でダウンロードされてしまう。
+  function resetResult() {
+    if (status === 'running') return
+    setStatus('idle')
+    setDownload(null)
+  }
 
   async function handleExport() {
     setStatus('running')
     setErrorMessage(null)
     setProgress(null)
+    const exportedFormat = format
     try {
-      const blob = await onExport(format, (done, total) => setProgress({ done, total }), {
+      const blob = await onExport(exportedFormat, (done, total) => setProgress({ done, total }), {
         embedChapters,
       })
-      setDownloadUrl(URL.createObjectURL(blob))
+      setDownload({ url: URL.createObjectURL(blob), format: exportedFormat })
       setStatus('done')
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : String(error))
@@ -54,7 +71,10 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
           name="format"
           value="pdf"
           checked={format === 'pdf'}
-          onChange={() => setFormat('pdf')}
+          onChange={() => {
+            setFormat('pdf')
+            resetResult()
+          }}
         />
         PDF
       </label>
@@ -64,7 +84,10 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
           name="format"
           value="epub"
           checked={format === 'epub'}
-          onChange={() => setFormat('epub')}
+          onChange={() => {
+            setFormat('epub')
+            resetResult()
+          }}
         />
         EPUB
       </label>
@@ -74,7 +97,10 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
           <input
             type="checkbox"
             checked={embedChapters}
-            onChange={(event) => setEmbedChapters(event.target.checked)}
+            onChange={(event) => {
+              setEmbedChapters(event.target.checked)
+              resetResult()
+            }}
           />
           しおり・目次を埋め込む
         </label>
@@ -98,10 +124,10 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
           {errorMessage}
         </p>
       )}
-      {status === 'done' && downloadUrl && (
+      {status === 'done' && download && (
         <a
-          href={downloadUrl}
-          download={`${title && sanitizeFileName(title) ? sanitizeFileName(title) : 'book'}.${format}`}
+          href={download.url}
+          download={`${title && sanitizeFileName(title) ? sanitizeFileName(title) : 'book'}.${download.format}`}
           data-testid="download-link"
         >
           ダウンロード
