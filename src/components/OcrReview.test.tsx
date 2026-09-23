@@ -56,6 +56,9 @@ function makeOcr(over: Partial<UseOcrResult> = {}): UseOcrResult {
     deleteLine: vi.fn().mockResolvedValue(undefined),
     addLine: vi.fn().mockResolvedValue(undefined),
     moveLine: vi.fn().mockResolvedValue(undefined),
+    concurrency: 2,
+    maxConcurrency: 7,
+    setConcurrency: vi.fn((n: number) => Math.min(7, Math.max(1, Math.floor(n)))),
     ...over,
   }
 }

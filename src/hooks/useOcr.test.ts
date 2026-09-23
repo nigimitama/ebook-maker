@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import { Blob as NodeBlob } from 'node:buffer'
 import { ImageStore } from '../lib/imageStore'
+import type { OcrStage } from '../lib/ocr/ocrMessages'
 import type { OcrRunner } from '../lib/ocr/ocrRunner'
 import type { OcrLine } from '../lib/ocr/types'
 import type { PageEntry } from '../types'
@@ -27,7 +28,7 @@ describe('useOcr', () => {
   const getStore = async () => store
 
   function setup(pageIds?: string[]) {
-    return renderHook((props: { ids?: string[] }) => useOcr(getStore, { createRunner, pageIds: props.ids }), {
+    return renderHook((props: { ids?: string[] }) => useOcr(getStore, { createRunner, pageIds: props.ids, cores: 2 }), {
       initialProps: { ids: pageIds },
     })
   }
@@ -123,7 +124,7 @@ describe('useOcr', () => {
   it('reports stage in progress', async () => {
     const seen: (string | undefined)[] = []
     const { result } = renderHook(() => {
-      const r = useOcr(getStore, { createRunner })
+      const r = useOcr(getStore, { createRunner, cores: 2 })
       seen.push(r.progress?.stage)
       return r
     })
@@ -278,5 +279,121 @@ describe('useOcr', () => {
       ])
     })
     expect(result.current.results[id].lines.map((l) => l.text)).toEqual(['A', 'B'])
+  })
+})
+
+describe('useOcr concurrency', () => {
+  let store: ImageStore
+  let pages: PageEntry[]
+  let log: string[]
+  let active: number
+  let maxActive: number
+  let failOn: Set<number>
+  let onDone: ((byte: number) => void) | undefined
+  let runners: OcrRunner[]
+  let storage: { getItem: (k: string) => string | null; setItem: (k: string, v: string) => void }
+  const getStore = async () => store
+
+  function makeRunner(index: number): OcrRunner {
+    return {
+      recognizePage: vi.fn(async (b: Blob, onStage?: (s: OcrStage) => void) => {
+        const byte = new Uint8Array(await b.arrayBuffer())[0]
+        log.push(`start:${index}:${byte}`)
+        active += 1
+        maxActive = Math.max(maxActive, active)
+        onStage?.('loading-models')
+        await new Promise((r) => setTimeout(r, 20))
+        log.push(`detecting:${index}`)
+        onStage?.('detecting')
+        await new Promise((r) => setTimeout(r, 30))
+        active -= 1
+        onDone?.(byte)
+        if (failOn.has(byte)) throw new Error('boom')
+        return [line(`l${byte}`, `t${byte}`)]
+      }),
+      dispose: vi.fn(),
+    }
+  }
+
+  function setup(concurrency: number) {
+    storage.setItem('ebook-maker:ocr-concurrency', String(concurrency))
+    const createRunner = vi.fn(() => {
+      const r = makeRunner(runners.length)
+      runners.push(r)
+      return r
+    })
+    return renderHook(() => useOcr(getStore, { createRunner, cores: 8, storage }))
+  }
+
+  beforeEach(async () => {
+    store = await ImageStore.open(`ocr-conc-${Math.random()}`)
+    pages = []
+    for (let i = 1; i <= 4; i += 1) pages.push(await store.addPage(blob(i), 5, 5, undefined, `p${i}.png`))
+    log = []
+    active = 0
+    maxActive = 0
+    failOn = new Set()
+    onDone = undefined
+    runners = []
+    const data = new Map<string, string>()
+    storage = { getItem: (k) => data.get(k) ?? null, setItem: (k, v) => void data.set(k, v) }
+  })
+
+  it('同時処理数ぶん並列に処理し、終了後はレーン0以外のRunnerを破棄する', async () => {
+    const { result } = setup(3)
+    await act(async () => {
+      await result.current.runAll(pages.map((p) => p.id))
+    })
+    expect(maxActive).toBe(3)
+    expect(runners).toHaveLength(3)
+    expect(Object.keys(result.current.results)).toHaveLength(4)
+    expect(runners[0].dispose).not.toHaveBeenCalled()
+    expect(runners[1].dispose).toHaveBeenCalled()
+    expect(runners[2].dispose).toHaveBeenCalled()
+  })
+
+  it('レーン0がモデルを読み終えるまで他レーンは始めない', async () => {
+    const { result } = setup(3)
+    await act(async () => {
+      await result.current.runAll(pages.map((p) => p.id))
+    })
+    const firstOther = log.findIndex((e) => e.startsWith('start:') && !e.startsWith('start:0:'))
+    expect(firstOther).toBeGreaterThan(log.indexOf('detecting:0'))
+  })
+
+  it('1ページの失敗は他レーンを止めず、そのレーンのRunnerだけ捨てる', async () => {
+    failOn.add(2)
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { result } = setup(3)
+    await act(async () => {
+      await result.current.runAll(pages.slice(0, 3).map((p) => p.id))
+    })
+    consoleError.mockRestore()
+    expect(Object.keys(result.current.results).sort()).toEqual([pages[0].id, pages[2].id].sort())
+    expect(result.current.error).toContain('p2.png')
+    expect(runners[0].dispose).not.toHaveBeenCalled()
+  })
+
+  it('中止すると処理中のページだけ保存し、残りは処理しない', async () => {
+    const { result } = setup(2)
+    onDone = () => result.current.cancel()
+    await act(async () => {
+      await result.current.runAll(pages.map((p) => p.id))
+    })
+    expect(log.filter((e) => e.startsWith('start:'))).toHaveLength(2)
+    expect(await store.listOcr()).toHaveLength(2)
+  })
+
+  it('setConcurrency は丸めて保存し、上限と既定値を公開する', () => {
+    const { result } = renderHook(() => useOcr(getStore, { cores: 4, storage }))
+    expect(result.current.maxConcurrency).toBe(3)
+    expect(result.current.concurrency).toBe(2)
+    let applied = 0
+    act(() => {
+      applied = result.current.setConcurrency(10)
+    })
+    expect(applied).toBe(3)
+    expect(result.current.concurrency).toBe(3)
+    expect(storage.getItem('ebook-maker:ocr-concurrency')).toBe('3')
   })
 })
