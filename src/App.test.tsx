@@ -102,15 +102,16 @@ describe('App', () => {
     expect(screen.getByText('書き出し')).toBeInTheDocument()
   })
 
-  // 目次の作成も任意工程。OCR確認から直接書き出しへ進める。
-  it('lets the user skip the 目次の作成 step', () => {
+  // タイトル・目次の設定も任意工程。OCR確認から直接書き出しへ進める。
+  // (タイトルは書き出し工程でも入力できる。文言は飛ばす工程を正しく名指しする)
+  it('lets the user skip the タイトル・目次 steps', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
-    fireEvent.click(screen.getByText('目次の作成をスキップして書き出しへ'))
+    fireEvent.click(screen.getByText('タイトル・目次の設定をスキップして書き出しへ'))
     expect(screen.getByText('書き出し')).toBeInTheDocument()
     expect(screen.queryByText('章を追加')).not.toBeInTheDocument()
   })

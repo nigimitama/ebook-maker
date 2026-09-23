@@ -175,9 +175,10 @@ export function App() {
                 <button type="button" className="btn btn-primary" onClick={() => goTo(3)}>
                   タイトルの設定へ進む
                 </button>
-                {/* 目次の作成も任意工程。既存の章立ては消さずに書き出しへ進む。 */}
+                {/* タイトル・目次の設定も任意工程(タイトルは書き出し工程でも入力できる)。
+                    既存の章立ては消さずに書き出しへ進む。 */}
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(5)}>
-                  目次の作成をスキップして書き出しへ
+                  タイトル・目次の設定をスキップして書き出しへ
                 </button>
                 <button type="button" className="btn btn-ghost" onClick={() => goTo(1)}>
                   戻る
