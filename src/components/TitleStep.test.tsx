@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { TitleStep, type TitleStepProps } from './TitleStep'
+import { EMPTY_TITLE_SELECTION } from '../types'
 import type { OcrResult } from '../lib/ocr/types'
 import type { PageEntry, RawImage } from '../types'
 
@@ -25,8 +27,20 @@ function ocrOf(texts: { text: string; w: number; h: number }[]): OcrResult {
   }
 }
 
-function setup(overrides: Partial<TitleStepProps> = {}) {
-  const props: TitleStepProps = {
+type HarnessProps = Omit<TitleStepProps, 'selection' | 'onSelectionChange'> & {
+  /** false で工程を離れた(アンマウントした)状態を再現する。 */
+  show?: boolean
+}
+
+// 候補の選択はApp側が持つ(工程をまたいでも消えないように)。その親の代わり。
+function Harness({ show = true, ...props }: HarnessProps) {
+  const [selection, setSelection] = useState(EMPTY_TITLE_SELECTION)
+  if (!show) return null
+  return <TitleStep {...props} selection={selection} onSelectionChange={setSelection} />
+}
+
+function setup(overrides: Partial<HarnessProps> = {}) {
+  const props: HarnessProps = {
     coverPage: coverPage(),
     thumbnail: 'blob:thumb',
     ocrResult: undefined,
@@ -37,8 +51,11 @@ function setup(overrides: Partial<TitleStepProps> = {}) {
     getPagePreview: vi.fn(async () => ({ data: new Uint8ClampedArray([1, 2, 3, 255]), width: 1, height: 1 }) as RawImage),
     ...overrides,
   }
-  const view = render(<TitleStep {...props} />)
-  return { props, ...view }
+  const view = render(<Harness {...props} />)
+  return {
+    props,
+    rerenderWith: (next: Partial<HarnessProps>) => view.rerender(<Harness {...props} {...next} />),
+  }
 }
 
 describe('TitleStep', () => {
@@ -174,7 +191,7 @@ describe('TitleStep', () => {
   it('does not re-fill the title once the user clears it, for the same OCR result', () => {
     const onChange = vi.fn()
     const ocrResult = ocrOf([{ text: 'メインタイトル', w: 100, h: 60 }])
-    const { rerender, props } = setup({
+    const { rerenderWith } = setup({
       ocrResult,
       metadata: { title: '', author: '' },
       onChange,
@@ -184,9 +201,61 @@ describe('TitleStep', () => {
 
     // ユーザーが自動入力されたタイトルを消した状態を再現する。ocrResult(と
     // updatedAt)は変わっていないので、再度自動入力されてはならない。
-    rerender(
-      <TitleStep {...props} ocrResult={ocrResult} metadata={{ title: '', author: '' }} onChange={onChange} />,
-    )
+    rerenderWith({ ocrResult, metadata: { title: '', author: '' }, onChange })
     expect(onChange).not.toHaveBeenCalled()
+  })
+
+  // 工程を離れて戻ってきても、チェックした候補は残り、消したタイトルが再入力されることもない。
+  it('keeps the checked candidates, and does not re-fill, when the step is left and reopened', () => {
+    const onChange = vi.fn()
+    const ocrResult = ocrOf([
+      { text: '著者名', w: 100, h: 20 },
+      { text: 'メインタイトル', w: 100, h: 60 },
+    ])
+    const { rerenderWith } = setup({ ocrResult, metadata: { title: '', author: '' }, onChange })
+    fireEvent.click(screen.getByLabelText('「著者名」を著者に含める'))
+    onChange.mockClear()
+
+    rerenderWith({ show: false })
+    rerenderWith({ show: true })
+
+    expect(screen.getByLabelText('「メインタイトル」をタイトルに含める')).toBeChecked()
+    expect(screen.getByLabelText('「著者名」を著者に含める')).toBeChecked()
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
+  // 候補のチェックは手入力したタイトルを置き換えるので、その場で元に戻せるようにする。
+  it('offers to restore a hand-typed title replaced by checking a candidate', () => {
+    const onChange = vi.fn()
+    setup({
+      ocrResult: ocrOf([{ text: 'ebook', w: 100, h: 30 }]),
+      metadata: { title: '手入力タイトル', author: '著者' },
+      onChange,
+    })
+    fireEvent.click(screen.getByLabelText('「ebook」をタイトルに含める'))
+    expect(onChange).toHaveBeenLastCalledWith({ title: 'ebook', author: '著者' })
+    expect(screen.getByRole('status')).toHaveTextContent('「手入力タイトル」を置き換えました')
+
+    fireEvent.click(screen.getByRole('button', { name: '「タイトルの置き換え」を取り消す' }))
+    expect(onChange).toHaveBeenLastCalledWith({ title: '手入力タイトル', author: '著者' })
+  })
+
+  it('offers to restore a hand-typed author replaced by checking a candidate', () => {
+    const onChange = vi.fn()
+    setup({
+      ocrResult: ocrOf([{ text: '著者名', w: 100, h: 20 }]),
+      metadata: { title: 'T', author: '手入力著者' },
+      onChange,
+    })
+    fireEvent.click(screen.getByLabelText('「著者名」を著者に含める'))
+    fireEvent.click(screen.getByRole('button', { name: '「著者の置き換え」を取り消す' }))
+    expect(onChange).toHaveBeenLastCalledWith({ title: 'T', author: '手入力著者' })
+  })
+
+  it('does not offer undo when the replaced title was empty', () => {
+    setup({ ocrResult: ocrOf([{ text: 'ebook', w: 100, h: 30 }]), metadata: { title: '', author: '' } })
+    // 空のタイトルは自動入力でebookになる(静的なmetadataなので表示上はまだ空)。
+    fireEvent.click(screen.getByLabelText('「ebook」をタイトルに含める'))
+    expect(screen.queryByRole('button', { name: /を取り消す/ })).not.toBeInTheDocument()
   })
 })

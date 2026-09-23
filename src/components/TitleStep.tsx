@@ -1,9 +1,12 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { OcrResult } from '../lib/ocr/types'
 import { guessTitle, joinSelectedLines, lineFontSize, sortByFontSizeDesc } from '../lib/titleGuess'
-import type { BookMetadata, PageEntry, RawImage } from '../types'
+import type { BookMetadata, PageEntry, RawImage, TitleSelection } from '../types'
 import { MetadataForm } from './MetadataForm'
 import { AdjustedPreview, ZoomModal } from './ZoomModal'
+
+type Field = 'title' | 'author'
+const FIELD_LABEL: Record<Field, string> = { title: 'タイトル', author: '著者' }
 
 export interface TitleStepProps {
   /** 表紙とみなす1ページ目。ページが1枚もなければ undefined。 */
@@ -19,6 +22,8 @@ export interface TitleStepProps {
   onChange: (metadata: BookMetadata) => void
   /** 拡大表示用に、指定ページの原本から生成したプレビュー画素を取得する。 */
   getPagePreview: (pageId: string) => Promise<RawImage>
+  selection: TitleSelection
+  onSelectionChange: (selection: TitleSelection) => void
 }
 
 // 1ページ目を表紙と仮定し、そのOCR結果から文字サイズが最大の行をタイトルの
@@ -32,14 +37,16 @@ export function TitleStep({
   metadata,
   onChange,
   getPagePreview,
+  selection,
+  onSelectionChange,
 }: TitleStepProps) {
   const [zoomOpen, setZoomOpen] = useState(false)
   const [zoomImage, setZoomImage] = useState<RawImage | null>(null)
   const [zoomError, setZoomError] = useState<string | null>(null)
-  // どのOCR行をタイトル/著者に含めるか。改行でbboxが分かれた行を複数選んで
-  // 結合できるよう、テキストの完全一致ではなく行IDの集合で持つ。
-  const [titleLineIds, setTitleLineIds] = useState<ReadonlySet<string>>(new Set())
-  const [authorLineIds, setAuthorLineIds] = useState<ReadonlySet<string>>(new Set())
+  // 候補のチェックで手入力の値を置き換えたときの、置き換え前の値(取り消し用)。
+  const [replaced, setReplaced] = useState<{ field: Field; previous: string } | null>(null)
+  const titleLineIds = new Set(selection.titleLineIds)
+  const authorLineIds = new Set(selection.authorLineIds)
 
   useEffect(() => {
     setZoomImage(null)
@@ -61,33 +68,32 @@ export function TitleStep({
   // 新しいOCR結果が来たときだけタイトルを自動入力する。metadataの変化そのもの
   // (ユーザーがタイトルを空に戻した場合など)では発火させない。そうしないと、
   // 一度自動入力した後にユーザーが消しても即座に同じ候補が再入力されてしまう。
-  const appliedOcrKeyRef = useRef<number | null>(null)
+  // 自動入力済みの印は selection に持つので、工程を離れて戻っても再入力しない。
   useEffect(() => {
     const key = ocrResult?.updatedAt ?? null
-    if (key === null || key === appliedOcrKeyRef.current) return
-    appliedOcrKeyRef.current = key
-    if (metadata.title !== '') return
+    if (key === null || key === selection.appliedOcrKey) return
+    if (metadata.title !== '') {
+      onSelectionChange({ ...selection, appliedOcrKey: key })
+      return
+    }
     const top = sortByFontSizeDesc(ocrResult)[0]
-    if (!top) return
-    setTitleLineIds(new Set([top.id]))
+    onSelectionChange({ ...selection, appliedOcrKey: key, titleLineIds: top ? [top.id] : selection.titleLineIds })
     const guess = guessTitle(ocrResult)
-    if (guess !== '') onChange({ ...metadata, title: guess })
-  }, [ocrResult, metadata, onChange])
+    if (top && guess !== '') onChange({ ...metadata, title: guess })
+  }, [ocrResult, selection, metadata, onChange, onSelectionChange])
 
-  function toggleTitleLine(lineId: string, checked: boolean) {
-    const next = new Set(titleLineIds)
+  function toggleLine(field: Field, lineId: string, checked: boolean) {
+    const key = field === 'title' ? 'titleLineIds' : 'authorLineIds'
+    const current = new Set(selection[key])
+    const next = new Set(current)
     if (checked) next.add(lineId)
     else next.delete(lineId)
-    setTitleLineIds(next)
-    onChange({ ...metadata, title: joinSelectedLines(ocrResult, next) })
-  }
-
-  function toggleAuthorLine(lineId: string, checked: boolean) {
-    const next = new Set(authorLineIds)
-    if (checked) next.add(lineId)
-    else next.delete(lineId)
-    setAuthorLineIds(next)
-    onChange({ ...metadata, author: joinSelectedLines(ocrResult, next) })
+    onSelectionChange({ ...selection, [key]: [...next] })
+    // チェックで作った値ではない(手入力した)値を置き換えるときは、取り消せるように控える。
+    const previous = metadata[field]
+    const handTyped = previous !== '' && previous !== joinSelectedLines(ocrResult, current)
+    setReplaced(handTyped ? { field, previous } : null)
+    onChange({ ...metadata, [field]: joinSelectedLines(ocrResult, next) })
   }
 
   if (!coverPage) {
@@ -102,7 +108,13 @@ export function TitleStep({
 
   return (
     <div className="title-step">
-      <MetadataForm metadata={metadata} onChange={onChange} />
+      <MetadataForm
+        metadata={metadata}
+        onChange={(next) => {
+          setReplaced(null)
+          onChange(next)
+        }}
+      />
 
       <div className="panel">
         <h2>OCR結果から入力</h2>
@@ -124,6 +136,23 @@ export function TitleStep({
           </button>
         </div>
 
+        {replaced && (
+          <p className="title-step__undo" role="status">
+            <span>{`「${replaced.previous}」を置き換えました`}</span>{' '}
+            <button
+              type="button"
+              className="btn btn-ghost"
+              aria-label={`「${FIELD_LABEL[replaced.field]}の置き換え」を取り消す`}
+              onClick={() => {
+                setReplaced(null)
+                onChange({ ...metadata, [replaced.field]: replaced.previous })
+              }}
+            >
+              元に戻す
+            </button>
+          </p>
+        )}
+
         <h3>候補(文字サイズが大きい順)</h3>
         {candidates.length === 0 && ocrResult === undefined && (
           <p>OCR結果がありません。表紙をOCRしてください。</p>
@@ -140,7 +169,7 @@ export function TitleStep({
                     type="checkbox"
                     checked={titleLineIds.has(line.id)}
                     aria-label={`「${line.text}」をタイトルに含める`}
-                    onChange={(event) => toggleTitleLine(line.id, event.target.checked)}
+                    onChange={(event) => toggleLine('title', line.id, event.target.checked)}
                   />
                   タイトル
                 </label>
@@ -149,7 +178,7 @@ export function TitleStep({
                     type="checkbox"
                     checked={authorLineIds.has(line.id)}
                     aria-label={`「${line.text}」を著者に含める`}
-                    onChange={(event) => toggleAuthorLine(line.id, event.target.checked)}
+                    onChange={(event) => toggleLine('author', line.id, event.target.checked)}
                   />
                   著者
                 </label>

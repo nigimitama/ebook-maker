@@ -12,7 +12,8 @@ import { MetadataForm } from './components/MetadataForm'
 import { detectTocPages } from './lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from './lib/toc/parseToc'
 import { ExportPanel } from './components/ExportPanel'
-import { DEFAULT_ADJUSTMENT } from './types'
+import { DEFAULT_ADJUSTMENT, EMPTY_TITLE_SELECTION, EMPTY_TOC_SELECTION } from './types'
+import type { TitleSelection, TocSelection } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
 const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', 'タイトルの設定', '目次の作成', '詳細＆書き出し'] as const
@@ -32,6 +33,18 @@ export function App() {
   const pageIds = useMemo(() => book.pages.map((p) => p.id), [book.pages])
   const ocr = useOcr(book.getStore, { pageIds })
   const chapters = useChapters(book.getStore, { pageIds })
+
+  // タイトル候補・目次ページの選択は、工程を離れて戻っても消えないようここで持つ。
+  const [titleSelection, setTitleSelection] = useState<TitleSelection>(EMPTY_TITLE_SELECTION)
+  const [tocSelectionState, setTocSelection] = useState<TocSelection>(EMPTY_TOC_SELECTION)
+  // 削除・結合で消えたページは目次ページの選択から外す。
+  const tocSelection = useMemo(
+    () => ({
+      ...tocSelectionState,
+      tocPageIds: tocSelectionState.tocPageIds.filter((id) => pageIds.includes(id)),
+    }),
+    [tocSelectionState, pageIds],
+  )
 
   const error = book.error ?? chapters.error
 
@@ -304,6 +317,8 @@ export function App() {
               metadata={book.metadata}
               onChange={book.setMetadata}
               getPagePreview={book.getPagePreview}
+              selection={titleSelection}
+              onSelectionChange={setTitleSelection}
             />
           )}
 
@@ -320,6 +335,8 @@ export function App() {
               onUpdateOcrLine={(pageId, lineId, text) => void ocr.updateLine(pageId, lineId, text)}
               onDeleteOcrLine={(pageId, lineId) => void ocr.deleteLine(pageId, lineId)}
               onMoveOcrLine={(pageId, lineId, toIndex) => void ocr.moveLine(pageId, lineId, toIndex)}
+              tocSelection={tocSelection}
+              onTocSelectionChange={setTocSelection}
             />
           )}
 

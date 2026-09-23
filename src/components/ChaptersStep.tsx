@@ -3,7 +3,7 @@ import type { OcrResult } from '../lib/ocr/types'
 import { newChapterId, sortChapters } from '../lib/toc/chapters'
 import { detectTocPages, tocScanWindow } from '../lib/toc/detectTocPages'
 import { defaultBodyStartIndex, parseToc } from '../lib/toc/parseToc'
-import type { Chapter, PageEntry, RawImage } from '../types'
+import type { Chapter, PageEntry, RawImage, TocSelection } from '../types'
 import { OcrLineList } from './OcrLineList'
 import { AdjustedPreview, ZoomModal } from './ZoomModal'
 
@@ -54,6 +54,8 @@ export interface ChaptersStepProps {
   onUpdateOcrLine: (pageId: string, lineId: string, text: string) => void
   onDeleteOcrLine: (pageId: string, lineId: string) => void
   onMoveOcrLine: (pageId: string, lineId: string, toIndex: number) => void
+  tocSelection: TocSelection
+  onTocSelectionChange: (selection: TocSelection) => void
 }
 
 export function ChaptersStep({
@@ -68,11 +70,11 @@ export function ChaptersStep({
   onUpdateOcrLine,
   onDeleteOcrLine,
   onMoveOcrLine,
+  tocSelection,
+  onTocSelectionChange,
 }: ChaptersStepProps) {
   const pageIds = useMemo(() => pages.map((p) => p.id), [pages])
-  const [tocPageIds, setTocPageIds] = useState<string[]>([])
-  const [bodyStart, setBodyStart] = useState(1) // 画像の何枚目が印刷ページ1か(1始まり)
-  const [bodyStartEdited, setBodyStartEdited] = useState(false)
+  const { tocPageIds, bodyStart, bodyStartEdited } = tocSelection
   const [notice, setNotice] = useState<string | null>(null)
   // 解析での置き換え・章の削除の直前の章立て。手で直した内容が消える操作なので、
   // 直後に1回だけ取り消せるようにする。ほかの編集をしたら失効させる。
@@ -111,8 +113,7 @@ export function ChaptersStep({
 
   function runDetection() {
     if (detection.pageIds.length > 0) {
-      setTocPageIds(detection.pageIds)
-      setBodyStartEdited(false)
+      onTocSelectionChange({ ...tocSelection, tocPageIds: detection.pageIds, bodyStartEdited: false })
       setNotice(null)
     } else {
       setNotice('自動検出できませんでした。手動で選んでください')
@@ -128,11 +129,15 @@ export function ChaptersStep({
   // 本文1ページ目の既定値は目次の次の画像。ユーザーが直したあとは動かさない。
   useEffect(() => {
     if (bodyStartEdited || tocPageIds.length === 0) return
-    setBodyStart(defaultBodyStartIndex(pageIds, tocPageIds) + 1)
-  }, [tocPageIds, pageIds, bodyStartEdited])
+    const next = defaultBodyStartIndex(pageIds, tocPageIds) + 1
+    if (next !== bodyStart) onTocSelectionChange({ ...tocSelection, bodyStart: next })
+  }, [tocSelection, tocPageIds, pageIds, bodyStart, bodyStartEdited, onTocSelectionChange])
 
   function toggleToc(id: string, checked: boolean) {
-    setTocPageIds((current) => (checked ? [...current, id] : current.filter((x) => x !== id)))
+    onTocSelectionChange({
+      ...tocSelection,
+      tocPageIds: checked ? [...tocPageIds, id] : tocPageIds.filter((x) => x !== id),
+    })
   }
 
   function handleParse() {
@@ -224,8 +229,11 @@ export function ChaptersStep({
             aria-label="本文1ページ目は画像何枚目か"
             value={bodyStart}
             onChange={(event) => {
-              setBodyStart(Number(event.target.value) || 1)
-              setBodyStartEdited(true)
+              onTocSelectionChange({
+                ...tocSelection,
+                bodyStart: Number(event.target.value) || 1,
+                bodyStartEdited: true,
+              })
             }}
           />
           枚目
