@@ -1,12 +1,21 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ImageStore } from '../lib/imageStore'
 import { OCR_MODEL_VERSION } from '../lib/ocr/ocrConfig'
+import type { OcrStage } from '../lib/ocr/ocrMessages'
 import { createOcrRunner, type OcrRunner } from '../lib/ocr/ocrRunner'
+import {
+  browserStorage,
+  clampOcrConcurrency,
+  loadOcrConcurrency,
+  maxOcrConcurrency,
+  saveOcrConcurrency,
+  type OcrSettingsStorage,
+} from '../lib/ocr/ocrSettings'
 import type { Box, OcrLine, OcrResult } from '../lib/ocr/types'
 
 export interface UseOcrResult {
   results: Record<string, OcrResult> // pageId → 結果
-  progress: { done: number; total: number; stage?: string } | null
+  progress: OcrProgress | null
   running: boolean
   error: string | null
   clearError: () => void
@@ -17,6 +26,20 @@ export interface UseOcrResult {
   deleteLine: (pageId: string, lineId: string) => Promise<void>
   addLine: (pageId: string, box: Box, afterLineId?: string) => Promise<void>
   moveLine: (pageId: string, lineId: string, toIndex: number) => Promise<void>
+  /** 同時に処理するページ数(=同時に動かすOCR Workerの数)。次の実行から反映される。 */
+  concurrency: number
+  /** この端末で選べる同時処理数の上限(論理コア数−1)。 */
+  maxConcurrency: number
+  /** 1〜上限に丸めて保存し、採用した値を返す。 */
+  setConcurrency: (n: number) => number
+}
+
+export interface OcrProgress {
+  done: number
+  total: number
+  stage?: string
+  /** 並列に処理しているレーン数。 */
+  concurrency?: number
 }
 
 export interface RunOptions {
@@ -37,6 +60,10 @@ export interface UseOcrOptions {
    * 保存済みのOCR結果を読み直し、古い結果が残らないようにする。
    */
   pageIds?: string[]
+  /** 論理コア数。既定は navigator.hardwareConcurrency(テストで差し替える)。 */
+  cores?: number
+  /** 同時処理数の保存先。既定は localStorage。 */
+  storage?: OcrSettingsStorage
 }
 
 let lineCounter = 0
@@ -53,13 +80,18 @@ export function useOcr(
   options: UseOcrOptions = {},
 ): UseOcrResult {
   const { pageIds } = options
+  const cores =
+    options.cores ?? (typeof navigator === 'undefined' ? undefined : navigator.hardwareConcurrency)
+  const maxConcurrency = maxOcrConcurrency(cores)
+  const [storage] = useState(() => options.storage ?? browserStorage())
   const createRunnerRef = useRef(options.createRunner ?? (() => createOcrRunner()))
   const getStoreRef = useRef(getStore)
   useEffect(() => {
     createRunnerRef.current = options.createRunner ?? (() => createOcrRunner())
     getStoreRef.current = getStore
   })
-  const runnerRef = useRef<OcrRunner | null>(null)
+  // レーンごとのRunner(=Worker)。レーン0は実行後も残し、1ページだけの再実行などで使い回す。
+  const runnersRef = useRef<(OcrRunner | null)[]>([])
   const cancelRef = useRef(false)
   const runningRef = useRef(false)
   const mountedRef = useRef(true)
@@ -70,6 +102,26 @@ export function useOcr(
   const [progress, setProgress] = useState<UseOcrResult['progress']>(null)
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [storedConcurrency, setStoredConcurrency] = useState(() =>
+    loadOcrConcurrency(maxConcurrency, storage),
+  )
+  const concurrency = clampOcrConcurrency(storedConcurrency, maxConcurrency)
+  // runAll は開始時点の値を読むので、描画を待たずに最新値を持っておく。
+  const concurrencyRef = useRef(concurrency)
+  useEffect(() => {
+    concurrencyRef.current = concurrency
+  }, [concurrency])
+
+  const setConcurrency = useCallback(
+    (n: number) => {
+      const value = clampOcrConcurrency(n, maxConcurrency)
+      saveOcrConcurrency(value, storage)
+      concurrencyRef.current = value
+      setStoredConcurrency(value)
+      return value
+    },
+    [maxConcurrency, storage],
+  )
 
   const setResults = useCallback((next: Record<string, OcrResult>) => {
     resultsRef.current = next
@@ -104,8 +156,8 @@ export function useOcr(
     return () => {
       mountedRef.current = false
       cancelRef.current = true
-      runnerRef.current?.dispose()
-      runnerRef.current = null
+      for (const runner of runnersRef.current) runner?.dispose()
+      runnersRef.current = []
     }
   }, [])
 
@@ -115,9 +167,16 @@ export function useOcr(
     cancelRef.current = true
   }, [])
 
-  const discardRunner = useCallback(() => {
-    runnerRef.current?.dispose()
-    runnerRef.current = null
+  const discardRunner = useCallback((lane: number) => {
+    runnersRef.current[lane]?.dispose()
+    runnersRef.current[lane] = null
+  }, [])
+
+  // fromLane 以降のRunnerを破棄する(Workerごとにモデルのメモリを持つため)。
+  const disposeRunners = useCallback((fromLane: number) => {
+    const runners = runnersRef.current
+    for (let lane = fromLane; lane < runners.length; lane += 1) runners[lane]?.dispose()
+    runners.length = Math.min(runners.length, fromLane)
   }, [])
 
   const runAll = useCallback(
@@ -128,7 +187,7 @@ export function useOcr(
       runningRef.current = true
       cancelRef.current = false
       setRunning(true)
-      const failed: string[] = []
+      const failed: { index: number; name: string }[] = []
       try {
         const store = await getStoreRef.current()
         if (!store) return summary
@@ -145,25 +204,54 @@ export function useOcr(
             }
             return true
           })
-        setProgress({ done: 0, total: targets.length })
-        for (const [index, page] of targets.entries()) {
-          if (cancelRef.current || !mountedRef.current) break
+        const lanes = Math.max(1, Math.min(concurrencyRef.current, targets.length))
+        const stages = new Array<OcrStage | undefined>(lanes).fill(undefined)
+        let next = 0
+        let done = 0
+
+        const report = () => {
+          if (!mountedRef.current) return
+          // 並列時は各レーンの細かい段階を出し分けず、モデル読み込み中だけ知らせる。
+          const stage = stages.includes('loading-models')
+            ? 'loading-models'
+            : lanes === 1
+              ? stages[0]
+              : undefined
+          setProgress({ done, total: targets.length, stage, concurrency: lanes })
+        }
+        setProgress({ done: 0, total: targets.length, concurrency: lanes })
+
+        // 初回はモデルをネットワークから取得するので、全レーンが同時に始めると
+        // 同じモデルをレーン数ぶんダウンロードしてしまう。レーン0がモデルを
+        // 読み終える(か最初のページを終える)まで、他のレーンは待たせる。
+        let markLoaded = () => {}
+        const firstLoaded = new Promise<void>((resolve) => {
+          markLoaded = resolve
+        })
+
+        const processPage = async (
+          lane: number,
+          index: number,
+          page: (typeof targets)[number],
+        ): Promise<'done' | 'unmounted'> => {
           try {
             const blob = await store.getBlob(page.blobId)
             if (!blob) throw new Error(`image data not found for page: ${page.id}`)
-            if (!mountedRef.current) break
-            runnerRef.current ??= createRunnerRef.current()
-            const lines = await runnerRef.current.recognizePage(blob, (stage) => {
-              if (mountedRef.current) setProgress({ done: index, total: targets.length, stage })
+            if (!mountedRef.current) return 'unmounted'
+            const runner = (runnersRef.current[lane] ??= createRunnerRef.current())
+            const lines = await runner.recognizePage(blob, (stage) => {
+              stages[lane] = stage
+              if (lane === 0 && stage !== 'loading-models') markLoaded()
+              report()
             })
-            if (!mountedRef.current) break
+            if (!mountedRef.current) return 'unmounted'
             // 認識中にページが削除された場合は、孤立したOCR結果を残さない。
-            if (!(await store.listPages()).some((p) => p.id === page.id)) continue
+            if (!(await store.listPages()).some((p) => p.id === page.id)) return 'done'
             // 認識中にユーザーが編集していた場合は、その編集を守って新しい結果を捨てる。
             const latest = await store.getOcr(page.id)
             if (!opts?.overwriteEdited && latest?.lines.some((l) => l.edited)) {
               setResults({ ...resultsRef.current, [page.id]: latest })
-              continue
+              return 'done'
             }
             const result: OcrResult = {
               pageId: page.id,
@@ -174,16 +262,41 @@ export function useOcr(
             await store.putOcr(result)
             if (mountedRef.current) setResults({ ...resultsRef.current, [page.id]: result })
           } catch (error) {
-            failed.push(page.fileName ?? page.id)
+            failed.push({ index, name: page.fileName ?? page.id })
             // 原因(モデル取得失敗の詳細など)をUIの短いメッセージに含めると
             // 長くなりすぎるため、コンソールにだけ出す。
             console.error(`OCRに失敗しました: ${page.fileName ?? page.id}`, error)
-            // Workerが壊れている可能性があるので捨てる。次のページで作り直される。
-            discardRunner()
+            // Workerが壊れている可能性があるので、このレーンのものだけ捨てる。
+            // 次のページで作り直される。
+            discardRunner(lane)
+          } finally {
+            stages[lane] = undefined
           }
-          if (mountedRef.current) setProgress({ done: index + 1, total: targets.length })
+          return 'done'
         }
+
+        // 各レーンは共有の対象リストから次のページを取っていく。
+        const runLane = async (lane: number) => {
+          if (lane > 0) await firstLoaded
+          try {
+            while (!cancelRef.current && mountedRef.current && next < targets.length) {
+              const index = next
+              next += 1
+              const outcome = await processPage(lane, index, targets[index])
+              if (lane === 0) markLoaded()
+              if (outcome === 'unmounted') return
+              done += 1
+              report()
+            }
+          } finally {
+            if (lane === 0) markLoaded()
+          }
+        }
+
+        await Promise.all(Array.from({ length: lanes }, (_, lane) => runLane(lane)))
       } finally {
+        // レーン0以外のWorkerはモデルのメモリを抱えたままなので、終わったら捨てる。
+        disposeRunners(1)
         runningRef.current = false
         if (mountedRef.current) {
           setRunning(false)
@@ -193,7 +306,10 @@ export function useOcr(
       if (mountedRef.current) {
         setError(
           failed.length > 0
-            ? `文字認識に失敗しました: ${failed.join(', ')} (詳細はブラウザの開発者ツールのコンソールを確認してください)`
+            ? `文字認識に失敗しました: ${failed
+                .sort((a, b) => a.index - b.index)
+                .map((f) => f.name)
+                .join(', ')} (詳細はブラウザの開発者ツールのコンソールを確認してください)`
             : null,
         )
         if (reloadPendingRef.current) {
@@ -203,7 +319,7 @@ export function useOcr(
       }
       return summary
     },
-    [setResults, discardRunner, reload],
+    [setResults, discardRunner, disposeRunners, reload],
   )
 
   const runOne = useCallback(
@@ -282,5 +398,8 @@ export function useOcr(
     deleteLine,
     addLine,
     moveLine,
+    concurrency,
+    maxConcurrency,
+    setConcurrency,
   }
 }

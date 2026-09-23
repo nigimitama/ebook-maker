@@ -56,6 +56,9 @@ function makeOcr(over: Partial<UseOcrResult> = {}): UseOcrResult {
     deleteLine: vi.fn().mockResolvedValue(undefined),
     addLine: vi.fn().mockResolvedValue(undefined),
     moveLine: vi.fn().mockResolvedValue(undefined),
+    concurrency: 2,
+    maxConcurrency: 7,
+    setConcurrency: vi.fn((n: number) => Math.min(7, Math.max(1, Math.floor(n)))),
     ...over,
   }
 }
@@ -134,6 +137,31 @@ describe('OcrReview', () => {
   it('モデル読み込み中は初回ダウンロードの案内を出す', () => {
     setup(makeOcr({ running: true, progress: { done: 0, total: 1, stage: 'loading-models' } }))
     expect(screen.getByText(/モデルを読み込み中\(初回のみ約157MBをダウンロードします\)/)).toBeInTheDocument()
+  })
+
+  it('OCRの設定で同時処理数を入力でき、確定時に丸めた値を表示する', () => {
+    const ocr = makeOcr()
+    setup(ocr)
+    const input = screen.getByLabelText('同時に処理するページ数') as HTMLInputElement
+    expect(input.value).toBe('2')
+    expect(screen.getByText(/この端末の上限: 7/)).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: '20' } })
+    fireEvent.blur(input)
+    expect(ocr.setConcurrency).toHaveBeenCalledWith(20)
+    expect(input.value).toBe('7')
+    fireEvent.change(input, { target: { value: '3' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(ocr.setConcurrency).toHaveBeenLastCalledWith(3)
+  })
+
+  it('実行中は同時処理数を変更できない', () => {
+    setup(makeOcr({ running: true, progress: { done: 0, total: 3 } }))
+    expect(screen.getByLabelText('同時に処理するページ数')).toBeDisabled()
+  })
+
+  it('並列実行中は並列数を進捗に出す', () => {
+    setup(makeOcr({ running: true, progress: { done: 1, total: 4, concurrency: 3 } }))
+    expect(screen.getByText(/文字認識中\(3並列\)/)).toBeInTheDocument()
   })
 
   it('修正済み行に印が付く', () => {

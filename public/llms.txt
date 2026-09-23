@@ -38,3 +38,12 @@ OCR済みのページから目次を読み取り、目次として書き出し�
    章を付けたくなければ `setChapters([])`。
 
 章は `{ id, title, pageId, level }`。levelは1(章)か2(節)の2階層まで。
+
+## OCRの同時処理数
+
+OCRは複数のWorkerでページ単位に並列実行できる。同時処理数(同時に動かすWorker数)は
+1〜この端末の上限(論理コア数−1)で、既定は2(上限が1なら1)。
+
+- `getOcrConcurrency()` で `{ value, max }` を取得する(`getState().ocr.concurrency` / `maxConcurrency` でも見られる)。
+- `setOcrConcurrency(n)` で設定する。範囲外は丸められ、採用した値が返る。設定はブラウザに保存され、次の実行から反映される。
+- 増やすほど速いが、Workerごとにモデルを読み込むのでメモリを多く使う。
