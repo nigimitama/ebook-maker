@@ -93,7 +93,7 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
       </label>
       </div>
       {chapterCount > 0 && (
-        <label>
+        <label className="export-panel__option">
           <input
             type="checkbox"
             checked={embedChapters}
@@ -105,9 +105,12 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
           しおり・目次を埋め込む
         </label>
       )}
-      <button type="button" onClick={handleExport} disabled={status === 'running'}>
-        書き出し
-      </button>
+      {/* 設定の横に並ぶと設定の一部に見えるので、書き出しボタンは設定の下に置く。 */}
+      <div className="export-panel__actions">
+        <button type="button" onClick={handleExport} disabled={status === 'running'}>
+          書き出し
+        </button>
+      </div>
       {status === 'running' &&
         (progress ? (
           <ProgressBar

@@ -616,6 +616,15 @@ label {
   margin-bottom: 12px;
 }
 
+.export-panel__option {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.export-panel__actions {
+  margin-top: 4px;
+}
+
 .export-panel__error {
   color: var(--color-danger);
 }
