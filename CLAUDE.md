@@ -15,6 +15,7 @@ npm run typecheck  # tsc -b
 npm run build      # tsc -b && vite build
 npm run lint       # oxlint
 npm run test:e2e   # Playwright (e2e/)
+npm run test:ocr   # 実OCRモデルを使う重いテスト(e2e-ocr/)。要 npm run fetch-models、CIでは動かさない
 ```
 
 `npm test` does not type-check (esbuild), so always run `npm run typecheck` / `npm run build` after changes. CI (PRs) runs `typecheck` and `test`.

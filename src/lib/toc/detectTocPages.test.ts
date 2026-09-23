@@ -11,6 +11,24 @@ function result(pageId: string, texts: string[]): OcrResult {
   }
 }
 
+// 縦書きの行を想定し、幅を推定文字サイズ、高さを文字数ぶんの長さにする。
+function sizedResult(pageId: string, lines: [string, number][]): OcrResult {
+  return {
+    pageId,
+    modelVersion: 't',
+    updatedAt: 1,
+    lines: lines.map(([text, size], i) => ({
+      id: `${pageId}-${i}`,
+      x: 1000 - i * 30,
+      y: 0,
+      w: size,
+      h: size * Math.max(text.length, 1),
+      text,
+      edited: false,
+    })),
+  }
+}
+
 const tocLines = [
   '目次',
   '第1章 はじめに ........ 3',
@@ -244,5 +262,98 @@ describe('detectTocPages with real-looking toc layouts', () => {
     ]
     const results = { p0: result('p0', lines) }
     expect(detectTocPages(ids, results).pageIds).toEqual(['p0'])
+  })
+
+  // 09_fontsize_contrast_chapter_preview.png: 1ページに2章だけ、各章に長い要約文が付く目次。
+  // 項目数も行に占める項目の割合も少ないが、章名が要約文より明らかに大きい文字で組まれている。
+  // 縦書きなので推定文字サイズ(bboxの短い辺)は列の幅になる。各行の大きさは実OCR
+  // (e2e-ocr/toc-real-ocr.spec.ts)の結果の値。ページ番号「62」「84」は、OCR側で章名の行の
+  // 末尾から切り分けた独立の行になる(lib/ocr/trailingNumber.ts)。
+  describe('chapter-preview toc with font-size contrast (09)', () => {
+    const summary5 = [
+      '一流の人は当たり前のことを徹底している/と思ってしまう/自分',
+      'が普通だと思っていることが/実は特別だという事実に/気づいて',
+      'いないだけかもしれない/継続できる人とできない人の違いは/才',
+      '能ではなく仕組みにある/モチベーションに頼らず/自動的に体が',
+      '動く状態を作れるかが/分かれ目になる/小さな習慣を積み重ねる',
+      'ことでしか/大きな変化は起こらない/今日 少しだけ昨日より前',
+      '進する/それだけでいい/完璧を求めすぎると続けることが苦しく',
+      'なる/六割の出来でも続けることを優先する',
+    ]
+    const summary6 = [
+      '選ぶことは同時に/何かを捨てることでもある/すべてを手に入れ',
+      'ようとする人ほど/結局は何も残らない/優先順位をつけられない',
+      'のは/判断基準を持っていないからだ/重要度と緊急度を分けて考',
+      'える/それだけで景色が変わる/限られた時間の中で/最大の成果',
+      'を出す人に共通するのは/「やらないこと」を先に決めている点だ',
+      '/忙しさは成果の証ではない/むしろ優先順位のなさの表れである',
+    ]
+    const chapter = (
+      num: string,
+      title: string,
+      page: string,
+      subtitle: string,
+      summary: string[],
+      headlineSize = 51,
+    ) =>
+      [
+        ['第', 24],
+        [num, 77],
+        ['章', 22],
+        [title, headlineSize],
+        ['|', 2],
+        ['|', 2],
+        [page, 16],
+        [subtitle, 28],
+        ...summary.map((text) => [text, 19]),
+      ] as [string, number][]
+    const page09 = [
+      ...chapter('5', '習慣と継続の「仕組み化」', '62', '——成果を出す人が徹底していること', summary5),
+      ...chapter('6', '選択と集中の「優先順位」', '84', '——限られた時間で最大の成果を出す方法', summary6),
+    ]
+
+    it('detects the page because every chapter title is much larger than the summaries', () => {
+      const results = { p1: sizedResult('p1', page09) }
+      expect(detectTocPages(ids, results).pageIds).toEqual(['p1'])
+    })
+
+    it('does not treat subtitle-sized titles (about 1.4x the summaries) as headlines', () => {
+      const weak = [
+        ...chapter('5', '習慣と継続の「仕組み化」', '62', '——成果を出す人が徹底していること', summary5, 28),
+        ...chapter('6', '選択と集中の「優先順位」', '84', '——限られた時間で最大の成果を出す方法', summary6, 28),
+      ]
+      const results = { p1: sizedResult('p1', weak) }
+      expect(detectTocPages(ids, results).pageIds).toEqual([])
+    })
+
+    it('does not detect the same text without font-size contrast', () => {
+      const flat = page09.map(([text]) => [text, 19] as [string, number])
+      const results = { p1: sizedResult('p1', flat) }
+      expect(detectTocPages(ids, results).pageIds).toEqual([])
+    })
+
+    it('does not detect it when the page numbers are not ascending', () => {
+      const swapped = page09.map(([text, size]) => [text === '62' ? '99' : text, size] as [string, number])
+      const results = { p1: sizedResult('p1', swapped) }
+      expect(detectTocPages(ids, results).pageIds).toEqual([])
+    })
+
+    it('does not detect a body chapter-opening page with a single large heading', () => {
+      const opening: [string, number][] = [
+        ['第', 24],
+        ['5', 77],
+        ['章', 22],
+        ['習慣と継続の「仕組み化」', 51],
+        ...summary5.map((text) => [text, 19] as [string, number]),
+        ['62', 16],
+      ]
+      const results = { p1: sizedResult('p1', opening) }
+      expect(detectTocPages(ids, results).pageIds).toEqual([])
+    })
+
+    it('continues a toc block onto a following chapter-preview page', () => {
+      const results = { p0: result('p0', tocLines), p1: sizedResult('p1', page09) }
+      expect(detectTocPages(ids, results).pageIds).toEqual(['p0', 'p1'])
+    })
   })
 })

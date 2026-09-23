@@ -70,36 +70,51 @@ function levelOf(title: string): 1 | 2 {
   return LEVEL2_PATTERNS.some((pattern) => pattern.test(title)) ? 2 : 1
 }
 
+export interface SourcedTocEntry extends TocEntry {
+  /** 章名を取り出した行の、入力配列でのindex。 */
+  titleLineIndex: number
+  /** ページ番号を取り出した行のindex(章名と同じ行ならtitleLineIndexと同じ)。 */
+  pageLineIndex: number
+}
+
 /**
  * 目次ページのOCR行(読み順)から、章名と印刷ページ番号の組を取り出す。
  * 「章名 ……… 12」形式と、章名の行と番号だけの行が分かれた形式に対応する。
  */
 export function parseTocEntries(lines: string[]): TocEntry[] {
-  const entries: TocEntry[] = []
-  let pending: string | null = null
-  const push = (title: string, page: number) => {
-    if (page >= 1) entries.push({ title, printedPage: page, level: levelOf(title) })
+  return parseTocEntriesWithSource(lines).map(({ title, printedPage, level }) => ({ title, printedPage, level }))
+}
+
+/** parseTocEntries と同じ解析で、各項目の章名・ページ番号がどの行から来たかも返す(目次判定用)。 */
+export function parseTocEntriesWithSource(lines: string[]): SourcedTocEntry[] {
+  const entries: SourcedTocEntry[] = []
+  let pending: { title: string; index: number } | null = null
+  const push = (title: string, page: number, titleLineIndex: number, pageLineIndex: number) => {
+    if (page >= 1) entries.push({ title, printedPage: page, level: levelOf(title), titleLineIndex, pageLineIndex })
   }
-  for (const raw of lines) {
+  lines.forEach((raw, index) => {
     const text = raw.normalize('NFKC').trim()
-    if (text === '') continue
+    if (text === '') return
+    // 章名とページ番号の間の罫線(縦書きの「|」等)や単独の点線リーダーは、
+    // 文字も数字も含まない。読み飛ばして、保留中の章名を番号と結び付けられるようにする。
+    if (!/[\p{L}\p{N}]/u.test(text)) return
     const bareNumber = parseBareNumber(text)
     if (bareNumber !== null) {
-      if (pending !== null && isValidTitle(pending)) push(pending, bareNumber)
+      if (pending !== null && isValidTitle(pending.title)) push(pending.title, bareNumber, pending.index, index)
       pending = null
-      continue
+      return
     }
     const match = TAIL_NUMBER.exec(text)
     if (match) {
       const title = cleanTitle(match[1])
       if (isValidTitle(title)) {
-        push(title, Number(match[2]))
+        push(title, Number(match[2]), index, index)
         pending = null
-        continue
+        return
       }
     }
-    pending = cleanTitle(text)
-  }
+    pending = { title: cleanTitle(text), index }
+  })
   return entries
 }
 

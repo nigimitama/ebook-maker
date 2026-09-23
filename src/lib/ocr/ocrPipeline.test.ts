@@ -142,3 +142,69 @@ describe('runOcr', () => {
     expect(result.lines[0].blockId).toBe(result.lines[1].blockId)
   })
 })
+
+describe('runOcr: 縦書きの行末のページ番号', () => {
+  // charset[id-1] 写像なので id4='あ', id5='い', id8='6', id9='2'
+  const charset = ['x', 'y', 'z', 'あ', 'い', 'う', 'え', '6', '2']
+  const vocab = 10
+  const size = OCR_CONFIG.layout.inputSize
+
+  // 幅60・高さ400の縦書きの行(x=10..40)。24x24の字が6つ(字間6)並び、
+  // 大きく空けて横組みの番号(18x12)が続く。scale = 800/400 = 2。
+  function imageWithNumber(): RawImage {
+    const img = blankImage(60, 400)
+    const rects: [number, number, number, number][] = [
+      ...Array.from({ length: 6 }, (_, i) => [13, 4 + i * 30, 24, 24] as [number, number, number, number]),
+      [16, 230, 18, 12],
+    ]
+    for (const [x, y, w, h] of rects) {
+      for (let yy = y; yy < y + h; yy += 1) {
+        for (let xx = x; xx < x + w; xx += 1) img.data.fill(0, (yy * 60 + xx) * 4, (yy * 60 + xx) * 4 + 3)
+      }
+    }
+    return img
+  }
+  const raw = {
+    boxes: new Float32Array([10 * 2, 0, 40 * 2, 260 * 2]),
+    scores: new Float32Array([0.9]),
+    classIds: new BigInt64Array([2n]), // line_main
+    charCounts: new BigInt64Array([2n]), // -> 50文字モデル
+  }
+
+  function sessionsReturning(tailIds: number[]): { sessions: OcrSessions; keys: RecognizerKey[] } {
+    const keys: RecognizerKey[] = []
+    const sessions: OcrSessions = {
+      detect: async (_tensor, s) => {
+        expect(s).toBe(size)
+        return raw
+      },
+      // 末尾の候補は30文字モデルで読む。それ以外(行の本体・行全体)は 'あい'。
+      recognize: async (key) => {
+        keys.push(key)
+        const ids = key === 30 ? tailIds : [4, 5, 0]
+        return { logits: logitsFor(ids, vocab), seqLen: ids.length, vocab }
+      },
+    }
+    return { sessions, keys }
+  }
+
+  it('末尾が数字に読めれば、行の本体と番号の2行に分ける', async () => {
+    const { sessions, keys } = sessionsReturning([8, 9, 0])
+    const result = await runOcr(imageWithNumber(), sessions, charset)
+    expect(result.lines.map((l) => l.text)).toEqual(['あい', '62'])
+    const [head, tail] = result.lines
+    expect(head.y + head.h).toBeLessThan(tail.y)
+    expect(tail).toMatchObject({ x: 14, y: 228, w: 22, h: 16 })
+    // 末尾の候補(30) → 本体(char_countどおり50)の順に認識する。
+    expect(keys).toEqual([30, 50])
+  })
+
+  it('末尾が数字に読めなければ、行をそのまま認識する', async () => {
+    const { sessions, keys } = sessionsReturning([6, 0])
+    const result = await runOcr(imageWithNumber(), sessions, charset)
+    expect(result.lines.map((l) => l.text)).toEqual(['あい'])
+    expect(result.lines[0]).toMatchObject({ x: 10, y: 0, w: 30 })
+    expect(result.lines[0].h).toBeCloseTo(260 * 1.02, 5)
+    expect(keys).toEqual([30, 50])
+  })
+})
