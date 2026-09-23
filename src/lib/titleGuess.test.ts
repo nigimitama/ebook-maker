@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { guessTitle, lineFontSize, sortByFontSizeDesc } from './titleGuess'
+import { guessTitle, joinSelectedLines, lineFontSize, sortByFontSizeDesc } from './titleGuess'
 import type { OcrLine, OcrResult } from './ocr/types'
 
 function line(id: string, overrides: Partial<OcrLine> = {}): OcrLine {
@@ -66,5 +66,36 @@ describe('guessTitle', () => {
   it('returns an empty string when there is nothing to guess from', () => {
     expect(guessTitle(undefined)).toBe('')
     expect(guessTitle(result([]))).toBe('')
+  })
+})
+
+describe('joinSelectedLines', () => {
+  it('joins the text of selected lines in reading order, not selection order', () => {
+    const lines = [
+      line('a', { text: 'ebook' }),
+      line('b', { text: 'maker' }),
+      line('c', { text: 'すごい' }),
+    ]
+    // 選択順は c → a → b だが、結合は読み順(a, b, c)になる。
+    expect(joinSelectedLines(result(lines), new Set(['c', 'a', 'b']))).toBe('ebookmakerすごい')
+  })
+
+  it('joins only the selected lines, skipping unselected ones', () => {
+    const lines = [line('a', { text: '前' }), line('b', { text: '中' }), line('c', { text: '後' })]
+    expect(joinSelectedLines(result(lines), new Set(['a', 'c']))).toBe('前後')
+  })
+
+  it('returns an empty string when nothing is selected', () => {
+    const lines = [line('a', { text: 'メインタイトル' })]
+    expect(joinSelectedLines(result(lines), new Set())).toBe('')
+  })
+
+  it('returns an empty string when there is no OCR result', () => {
+    expect(joinSelectedLines(undefined, new Set(['a']))).toBe('')
+  })
+
+  it('ignores a selected id whose text is blank', () => {
+    const lines = [line('a', { text: '  ' }), line('b', { text: '本文' })]
+    expect(joinSelectedLines(result(lines), new Set(['a', 'b']))).toBe('本文')
   })
 })

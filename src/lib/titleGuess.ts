@@ -22,3 +22,15 @@ export function sortByFontSizeDesc(result: OcrResult | undefined): OcrLine[] {
 export function guessTitle(result: OcrResult | undefined): string {
   return sortByFontSizeDesc(result)[0]?.text ?? ''
 }
+
+/**
+ * 選択された行のテキストを読み順(表示順ではなくOCR結果の行順)で連結する。
+ * 改行でbboxが分かれているタイトル・著者名を、複数選択してまとめるのに使う。
+ */
+export function joinSelectedLines(result: OcrResult | undefined, selectedIds: ReadonlySet<string>): string {
+  if (!result) return ''
+  return result.lines
+    .filter((line) => selectedIds.has(line.id) && line.text.trim() !== '')
+    .map((line) => line.text)
+    .join('')
+}

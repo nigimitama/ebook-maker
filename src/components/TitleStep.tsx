@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { OcrResult } from '../lib/ocr/types'
-import { guessTitle, lineFontSize, sortByFontSizeDesc } from '../lib/titleGuess'
+import { guessTitle, joinSelectedLines, lineFontSize, sortByFontSizeDesc } from '../lib/titleGuess'
 import type { BookMetadata, PageEntry, RawImage } from '../types'
 import { MetadataForm } from './MetadataForm'
 import { AdjustedPreview, ZoomModal } from './ZoomModal'
@@ -36,6 +36,10 @@ export function TitleStep({
   const [zoomOpen, setZoomOpen] = useState(false)
   const [zoomImage, setZoomImage] = useState<RawImage | null>(null)
   const [zoomError, setZoomError] = useState<string | null>(null)
+  // どのOCR行をタイトル/著者に含めるか。改行でbboxが分かれた行を複数選んで
+  // 結合できるよう、テキストの完全一致ではなく行IDの集合で持つ。
+  const [titleLineIds, setTitleLineIds] = useState<ReadonlySet<string>>(new Set())
+  const [authorLineIds, setAuthorLineIds] = useState<ReadonlySet<string>>(new Set())
 
   useEffect(() => {
     setZoomImage(null)
@@ -63,9 +67,28 @@ export function TitleStep({
     if (key === null || key === appliedOcrKeyRef.current) return
     appliedOcrKeyRef.current = key
     if (metadata.title !== '') return
+    const top = sortByFontSizeDesc(ocrResult)[0]
+    if (!top) return
+    setTitleLineIds(new Set([top.id]))
     const guess = guessTitle(ocrResult)
     if (guess !== '') onChange({ ...metadata, title: guess })
   }, [ocrResult, metadata, onChange])
+
+  function toggleTitleLine(lineId: string, checked: boolean) {
+    const next = new Set(titleLineIds)
+    if (checked) next.add(lineId)
+    else next.delete(lineId)
+    setTitleLineIds(next)
+    onChange({ ...metadata, title: joinSelectedLines(ocrResult, next) })
+  }
+
+  function toggleAuthorLine(lineId: string, checked: boolean) {
+    const next = new Set(authorLineIds)
+    if (checked) next.add(lineId)
+    else next.delete(lineId)
+    setAuthorLineIds(next)
+    onChange({ ...metadata, author: joinSelectedLines(ocrResult, next) })
+  }
 
   if (!coverPage) {
     return (
@@ -79,8 +102,12 @@ export function TitleStep({
 
   return (
     <div className="title-step">
+      <MetadataForm metadata={metadata} onChange={onChange} />
+
       <div className="panel">
-        <h2>表紙</h2>
+        <h2>OCR結果から入力</h2>
+
+        <p className="title-step__cover-caption">入力画像の1枚目を表紙と仮定しています</p>
         <div className="title-step__cover">
           {thumbnail && (
             <button
@@ -96,10 +123,8 @@ export function TitleStep({
             {ocrResult ? '表紙を再OCR' : '表紙をOCR'}
           </button>
         </div>
-      </div>
 
-      <div className="panel">
-        <h2>候補(文字サイズが大きい順)</h2>
+        <h3>候補(文字サイズが大きい順)</h3>
         {candidates.length === 0 && ocrResult === undefined && (
           <p>OCR結果がありません。表紙をOCRしてください。</p>
         )}
@@ -110,29 +135,29 @@ export function TitleStep({
               <li key={line.id} className="title-step__candidate">
                 <span className="title-step__candidate-text">{line.text}</span>
                 <span className="title-step__candidate-size">{`${Math.round(lineFontSize(line))}px`}</span>
-                <button
-                  type="button"
-                  className={metadata.title === line.text ? 'btn btn-primary' : 'btn btn-ghost'}
-                  aria-label={`「${line.text}」をタイトルにする`}
-                  onClick={() => onChange({ ...metadata, title: line.text })}
-                >
-                  タイトルにする
-                </button>
-                <button
-                  type="button"
-                  className={metadata.author === line.text ? 'btn btn-primary' : 'btn btn-ghost'}
-                  aria-label={`「${line.text}」を著者にする`}
-                  onClick={() => onChange({ ...metadata, author: line.text })}
-                >
-                  著者にする
-                </button>
+                <label className="title-step__candidate-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={titleLineIds.has(line.id)}
+                    aria-label={`「${line.text}」をタイトルに含める`}
+                    onChange={(event) => toggleTitleLine(line.id, event.target.checked)}
+                  />
+                  タイトル
+                </label>
+                <label className="title-step__candidate-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={authorLineIds.has(line.id)}
+                    aria-label={`「${line.text}」を著者に含める`}
+                    onChange={(event) => toggleAuthorLine(line.id, event.target.checked)}
+                  />
+                  著者
+                </label>
               </li>
             ))}
           </ul>
         )}
       </div>
-
-      <MetadataForm metadata={metadata} onChange={onChange} />
 
       {zoomOpen && (
         <ZoomModal

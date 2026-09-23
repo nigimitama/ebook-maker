@@ -58,6 +58,7 @@ describe('TitleStep', () => {
       onChange,
     })
     expect(onChange).toHaveBeenCalledWith({ title: 'メインタイトル', author: '' })
+    expect(screen.getByLabelText('「メインタイトル」をタイトルに含める')).toBeChecked()
   })
 
   it('does not overwrite a title the user already set', () => {
@@ -68,9 +69,24 @@ describe('TitleStep', () => {
       onChange,
     })
     expect(onChange).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('「メインタイトル」をタイトルに含める')).not.toBeChecked()
   })
 
-  it('lists OCR lines largest-first with size labels and lets the user assign title/author', () => {
+  it('lists OCR lines largest-first with size labels', () => {
+    setup({
+      ocrResult: ocrOf([
+        { text: '著者名', w: 100, h: 20 },
+        { text: 'タイトル候補', w: 100, h: 50 },
+      ]),
+      metadata: { title: 'タイトル候補', author: '' },
+    })
+    const candidates = screen.getAllByRole('listitem')
+    expect(within(candidates[0]).getByText('タイトル候補')).toBeInTheDocument()
+    expect(within(candidates[0]).getByText('50px')).toBeInTheDocument()
+    expect(within(candidates[1]).getByText('著者名')).toBeInTheDocument()
+  })
+
+  it('checks a single candidate for the author field', () => {
     const onChange = vi.fn()
     setup({
       ocrResult: ocrOf([
@@ -80,13 +96,58 @@ describe('TitleStep', () => {
       metadata: { title: 'タイトル候補', author: '' },
       onChange,
     })
-    const candidates = screen.getAllByRole('listitem')
-    expect(within(candidates[0]).getByText('タイトル候補')).toBeInTheDocument()
-    expect(within(candidates[0]).getByText('50px')).toBeInTheDocument()
-    expect(within(candidates[1]).getByText('著者名')).toBeInTheDocument()
-
-    fireEvent.click(within(candidates[1]).getByText('著者にする'))
+    fireEvent.click(screen.getByLabelText('「著者名」を著者に含める'))
     expect(onChange).toHaveBeenCalledWith({ title: 'タイトル候補', author: '著者名' })
+  })
+
+  it('joins multiple checked candidates in reading order, not check order, for the title', () => {
+    const onChange = vi.fn()
+    const ocrResult = ocrOf([
+      { text: 'ebook', w: 100, h: 30 },
+      { text: 'maker', w: 100, h: 25 },
+      { text: 'すごい', w: 100, h: 50 },
+    ])
+    // タイトルは既に入力済みにして自動入力の影響を避け、チェック操作だけを見る。
+    setup({ ocrResult, metadata: { title: '既存', author: '' }, onChange })
+
+    fireEvent.click(screen.getByLabelText('「maker」をタイトルに含める'))
+    fireEvent.click(screen.getByLabelText('「ebook」をタイトルに含める'))
+
+    expect(onChange).toHaveBeenLastCalledWith({ title: 'ebookmaker', author: '' })
+  })
+
+  it('unchecking a candidate removes it from the joined title', () => {
+    const onChange = vi.fn()
+    const ocrResult = ocrOf([
+      { text: 'ebook', w: 100, h: 30 },
+      { text: 'maker', w: 100, h: 25 },
+    ])
+    setup({ ocrResult, metadata: { title: '既存', author: '' }, onChange })
+
+    fireEvent.click(screen.getByLabelText('「ebook」をタイトルに含める'))
+    fireEvent.click(screen.getByLabelText('「maker」をタイトルに含める'))
+    expect(onChange).toHaveBeenLastCalledWith({ title: 'ebookmaker', author: '' })
+
+    fireEvent.click(screen.getByLabelText('「ebook」をタイトルに含める'))
+    expect(onChange).toHaveBeenLastCalledWith({ title: 'maker', author: '' })
+  })
+
+  it('lets a candidate be checked for title and author independently at the same time', () => {
+    const onChange = vi.fn()
+    const ocrResult = ocrOf([{ text: '著者名', w: 100, h: 20 }])
+    setup({ ocrResult, metadata: { title: '既存', author: '' }, onChange })
+
+    fireEvent.click(screen.getByLabelText('「著者名」を著者に含める'))
+    expect(onChange).toHaveBeenLastCalledWith({ title: '既存', author: '著者名' })
+
+    fireEvent.click(screen.getByLabelText('「著者名」をタイトルに含める'))
+    expect(onChange).toHaveBeenLastCalledWith({ title: '著者名', author: '' })
+  })
+
+  it('shows a caption noting it assumes the first page is the cover, in place of a "表紙" heading', () => {
+    setup()
+    expect(screen.getByText('入力画像の1枚目を表紙と仮定しています')).toBeInTheDocument()
+    expect(screen.queryByText('表紙', { selector: 'h3' })).not.toBeInTheDocument()
   })
 
   it('runs OCR on the cover page on demand', () => {
