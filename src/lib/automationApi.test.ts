@@ -69,14 +69,15 @@ describe('installAutomationApi', () => {
   })
 
   // 外部エージェントは describe() だけを見て操作するので、工程番号がずれたままだと
-  // 書き出し工程に行けない。OCR工程を含む0〜3を説明に載せる。
+  // 書き出し工程に行けない。OCR工程を含む0〜5を説明に載せる。
   it('documents the OCR step in goToStep and the OCR operations', () => {
     installAutomationApi(fakeApi())
 
     const methods = window.EbookMaker!.describe().methods
     expect(methods.goToStep).toContain('2:OCR確認・修正')
-    expect(methods.goToStep).toContain('3:目次の作成')
-    expect(methods.goToStep).toContain('4:詳細＆書き出し')
+    expect(methods.goToStep).toContain('3:タイトルの設定')
+    expect(methods.goToStep).toContain('4:目次の作成')
+    expect(methods.goToStep).toContain('5:詳細＆書き出し')
     for (const name of ['runOcr', 'runOcrAll', 'getOcr', 'setOcrLineText'] as const) {
       expect(methods[name]).toBeTruthy()
     }

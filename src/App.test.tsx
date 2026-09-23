@@ -63,10 +63,17 @@ describe('App', () => {
     expect(screen.getByText('見開き結合')).toBeInTheDocument()
   })
 
-  it('shows the five steps of the flow', () => {
+  it('shows the six steps of the flow', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(mockBook())
     render(<App />)
-    for (const label of ['読み込み', '並べ替え・調整', 'OCR確認・修正', '目次の作成', '詳細＆書き出し']) {
+    for (const label of [
+      '読み込み',
+      '並べ替え・調整',
+      'OCR確認・修正',
+      'タイトルの設定',
+      '目次の作成',
+      '詳細＆書き出し',
+    ]) {
       expect(screen.getByText(label)).toBeInTheDocument()
     }
   })
@@ -81,13 +88,14 @@ describe('App', () => {
     expect(screen.getByText('このページをOCR')).toBeInTheDocument()
   })
 
-  it('advances from the OCR確認・修正 step to the 目次の作成 step, then to 詳細＆書き出し', () => {
+  it('advances from the OCR確認・修正 step to タイトルの設定, then 目次の作成, then to 詳細＆書き出し', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
     )
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('タイトルの設定へ進む'))
     fireEvent.click(screen.getByText('目次の作成へ進む'))
     expect(screen.getByText('章を追加')).toBeInTheDocument()
     fireEvent.click(screen.getByText('詳細情報へ進む'))
@@ -126,6 +134,7 @@ describe('App', () => {
     render(<App />)
     fireEvent.click(screen.getByText('次へ'))
     fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('タイトルの設定へ進む'))
     fireEvent.click(screen.getByText('目次の作成へ進む'))
     fireEvent.click(screen.getByText('詳細情報へ進む'))
     fireEvent.click(screen.getByText('目次の作成へ戻る'))

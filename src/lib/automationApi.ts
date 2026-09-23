@@ -65,7 +65,7 @@ const API_DESCRIPTION: AutomationApiDescription = {
   name: 'ebook-maker automation API',
   methods: {
     getState: '() => AutomationState — 現在の状態(工程・ページ一覧・選択中ページ・メタデータ・エラー・OCRの実行状況等)をJSONで返す。',
-    goToStep: '(step: number) => void — 工程(0:読み込み, 1:並べ替え・調整, 2:OCR確認・修正, 3:目次の作成, 4:詳細＆書き出し)を切り替える。OCRと目次の作成は任意工程で、飛ばして4に進んでもよい。',
+    goToStep: '(step: number) => void — 工程(0:読み込み, 1:並べ替え・調整, 2:OCR確認・修正, 3:タイトルの設定, 4:目次の作成, 5:詳細＆書き出し)を切り替える。OCRと目次の作成は任意工程で、飛ばして5に進んでもよい。',
     getChapters: '() => Chapter[] — 目次({ id, title, pageId, level })を返す。levelは1=章, 2=節。配列順が書籍順(同一ページ内の順序も表す)。',
     setChapters: '(chapters: Chapter[]) => Promise<void> — 目次を丸ごと置き換えて保存する。空配列で目次なし。書き出し時、章があればPDFのしおり・EPUBの目次に埋め込まれる。',
     detectTocPages: '() => { pageIds: string[]; unscannedPageIds: string[] } — OCR結果から目次ページを自動検出する(先頭の一部のページが対象)。unscannedPageIdsは検出範囲内でOCR未実施のページ。',
