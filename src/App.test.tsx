@@ -142,6 +142,49 @@ describe('App', () => {
     expect(screen.getByText('章を追加')).toBeInTheDocument()
   })
 
+  // 書き出しの「戻る」は、飛ばしてきた工程ではなく来た工程へ戻す。
+  it('returns from 書き出し to 並べ替え・調整 when OCR was skipped', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRをスキップして書き出しへ'))
+    expect(screen.queryByText('目次の作成へ戻る')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('並べ替え・調整へ戻る'))
+    expect(screen.getByText('見開き結合')).toBeInTheDocument()
+  })
+
+  it('returns from 書き出し to OCR確認・修正 when the タイトル・目次 steps were skipped', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRへ進む'))
+    fireEvent.click(screen.getByText('タイトル・目次の設定をスキップして書き出しへ'))
+    fireEvent.click(screen.getByText('OCR確認・修正へ戻る'))
+    expect(screen.getByText('このページをOCR')).toBeInTheDocument()
+  })
+
+  // 飛ばした工程は「済」に見せない。ただし後から戻って作業できるよう、選べるままにする。
+  it('marks skipped steps as skipped, not done, while keeping them reachable', () => {
+    vi.spyOn(useBookModule, 'useBook').mockReturnValue(
+      mockBook({ pages: [page], thumbnails: { a: 'blob:a' } }),
+    )
+    render(<App />)
+    fireEvent.click(screen.getByText('次へ'))
+    fireEvent.click(screen.getByText('OCRをスキップして書き出しへ'))
+    const railStep = (label: string) => screen.getByText(label, { selector: '.rail span' }).closest('.step')!
+    expect(railStep('並べ替え・調整')).toHaveClass('step--done')
+    for (const label of ['OCR確認・修正', 'タイトルの設定', '目次の作成']) {
+      expect(railStep(label)).toHaveClass('step--skipped')
+      expect(railStep(label)).not.toHaveClass('step--done')
+    }
+    fireEvent.click(railStep('目次の作成'))
+    expect(screen.getByText('章を追加')).toBeInTheDocument()
+  })
+
   it('shows the AdjustmentEditor on the 並べ替え・調整 step once a page is selected and its image is loaded', () => {
     vi.spyOn(useBookModule, 'useBook').mockReturnValue(
       mockBook({

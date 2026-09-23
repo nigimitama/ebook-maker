@@ -16,12 +16,17 @@ import { DEFAULT_ADJUSTMENT } from './types'
 import { installAutomationApi, toAutomationPageSummary } from './lib/automationApi'
 
 const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', 'タイトルの設定', '目次の作成', '詳細＆書き出し'] as const
+const EXPORT_STEP = STEPS.length - 1
 
 export function App() {
   const book = useBook()
   const selectedPage = book.pages.find((p) => p.id === book.selectedPageId)
   const [step, setStep] = useState(0)
   const [maxStep, setMaxStep] = useState(0)
+  // 実際に開いた工程。スキップで飛び越えた工程は、選べても「済」には見せない。
+  const [visited, setVisited] = useState<ReadonlySet<number>>(() => new Set([0]))
+  // 書き出し工程の「戻る」の行き先。スキップで来たなら、飛ばした工程ではなく来た工程へ戻す。
+  const [exportBackStep, setExportBackStep] = useState(4)
   // ページが削除・結合・取り消しされたら保存済みのOCR結果を読み直させる。
   // 配列そのものを渡すと毎描画で別参照になるため、IDの並びで memo する。
   const pageIds = useMemo(() => book.pages.map((p) => p.id), [book.pages])
@@ -31,8 +36,10 @@ export function App() {
   const error = book.error ?? chapters.error
 
   function goTo(next: number) {
+    if (next === EXPORT_STEP && step !== EXPORT_STEP) setExportBackStep(step)
     setStep(next)
     setMaxStep((current) => Math.max(current, next))
+    setVisited((current) => (current.has(next) ? current : new Set(current).add(next)))
   }
 
   // 「並べ替え・調整」「OCR確認・修正」工程に入ったとき、まだ何も選ばれていなければ
@@ -133,9 +140,11 @@ export function App() {
                   className={
                     isActive
                       ? 'step step--active'
-                      : isReachable
-                        ? 'step step--done'
-                        : 'step step--disabled'
+                      : !isReachable
+                        ? 'step step--disabled'
+                        : visited.has(index)
+                          ? 'step step--done'
+                          : 'step step--skipped'
                   }
                   onClick={() => isReachable && goTo(index)}
                 >
@@ -206,8 +215,8 @@ export function App() {
               </>
             )}
             {step === 5 && (
-              <button type="button" className="btn btn-ghost" onClick={() => goTo(4)}>
-                目次の作成へ戻る
+              <button type="button" className="btn btn-ghost" onClick={() => goTo(exportBackStep)}>
+                {STEPS[exportBackStep]}へ戻る
               </button>
             )}
           </div>
