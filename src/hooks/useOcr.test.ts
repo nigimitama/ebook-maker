@@ -98,9 +98,26 @@ describe('useOcr', () => {
     })
     expect(calls).toEqual([1, 2, 3])
     expect(Object.keys(result.current.results).sort()).toEqual([pages[0].id, pages[2].id].sort())
-    expect(result.current.error).toBe('文字認識に失敗しました: p2.png')
+    expect(result.current.error).toBe(
+      '文字認識に失敗しました: p2.png (詳細はブラウザの開発者ツールのコンソールを確認してください)',
+    )
     act(() => result.current.clearError())
     expect(result.current.error).toBeNull()
+  })
+
+  it('logs the actual cause of a page failure to console.error (not just the filename)', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+    failOn.add(2)
+    const { result } = setup()
+    await act(async () => {
+      await result.current.runAll(pages.map((p) => p.id))
+    })
+    expect(consoleError).toHaveBeenCalledTimes(1)
+    const [message, loggedError] = consoleError.mock.calls[0]
+    expect(message).toContain('p2.png')
+    expect(loggedError).toBeInstanceOf(Error)
+    expect((loggedError as Error).message).toBe('boom')
+    consoleError.mockRestore()
   })
 
   it('reports stage in progress', async () => {

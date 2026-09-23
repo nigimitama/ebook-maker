@@ -1,6 +1,7 @@
 import type { OcrResult } from './ocr/types'
+import { buildParagraphs } from './paragraphs'
 
-/** 書籍順のページ列から、OCR済みページの行テキストを連結する。ページ間は空行。 */
+/** 書籍順のページ列から、OCR済みページの段落テキストを連結する。ページ間は空行。 */
 export function buildPlainText(
   pages: { id: string }[],
   results: Record<string, OcrResult>,
@@ -9,8 +10,8 @@ export function buildPlainText(
   for (const p of pages) {
     const r = results[p.id]
     if (!r) continue
-    const text = r.lines
-      .map((l) => l.text)
+    const text = buildParagraphs(r.lines)
+      .map((paragraph) => paragraph.text)
       .filter((t) => t !== '')
       .join('\n')
     if (text === '') continue

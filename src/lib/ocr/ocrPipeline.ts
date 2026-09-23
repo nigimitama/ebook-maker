@@ -31,7 +31,7 @@ function newLineId(): string {
   return `line-${Date.now()}-${idCounter}-${Math.random().toString(36).slice(2, 8)}`
 }
 
-// 1ページ分のOCR。レイアウト検出 -> 行の抽出 -> 読み順 -> 行ごとの文字認識。
+// 1ページ分のOCR。レイアウト検出 -> 行の抽出・ブロック割当て -> 読み順 -> 行ごとの文字認識。
 // 行ごとに逐次実行する(同時実行するとメモリを食うため。バッチ化はしない)。
 export async function runOcr(
   img: RawImage,
@@ -41,11 +41,11 @@ export async function runOcr(
   const size = OCR_CONFIG.layout.inputSize
   const { data, scale } = letterboxToTensor(img, size)
   const raw = await sessions.detect(data, size)
-  const dets = decodeDetections(raw, scale, img.width, img.height)
-  const ordered = sortReadingOrder(nms(dets, OCR_CONFIG.layout.nmsIou))
+  const { lines: dets, blocks } = decodeDetections(raw, scale, img.width, img.height)
+  const ordered = sortReadingOrder(nms(dets, OCR_CONFIG.layout.nmsIou), blocks)
 
   const lines: OcrLine[] = []
-  for (const det of ordered) {
+  for (const { detection: det, blockId } of ordered) {
     const key = pickRecognizer(det.charCount, det)
     const spec = OCR_CONFIG.recognizers[key]
     const tensor = lineToTensor(cropLine(img, det), spec.height, spec.width)
@@ -58,6 +58,7 @@ export async function runOcr(
       h: det.h,
       text: decodeSequence(logits, seqLen, vocab, charset),
       edited: false,
+      ...(blockId ? { blockId } : {}),
     })
   }
   return { lines }

@@ -40,12 +40,12 @@ describe('decodeDetections', () => {
       classIds: new BigInt64Array([2n, 2n]),
     })
     const out = decodeDetections(raw, 1, 1000, 1000)
-    expect(out).toHaveLength(1)
-    expect(out[0].score).toBeCloseTo(0.9)
+    expect(out.lines).toHaveLength(1)
+    expect(out.lines[0].score).toBeCloseTo(0.9)
   })
   it('scaleで割って原本座標へ戻す', () => {
     const raw = base({ boxes: new Float32Array([0, 200, 200, 400]) })
-    const [o] = decodeDetections(raw, 0.5, 1000, 1000)
+    const [o] = decodeDetections(raw, 0.5, 1000, 1000).lines
     expect(o.x).toBeCloseTo(0)
     expect(o.w).toBeCloseTo(400)
     // 高さ400に対し上下2%(8px)拡張
@@ -54,34 +54,60 @@ describe('decodeDetections', () => {
   })
   it('画像外にはみ出た箱を画像内に丸める', () => {
     const raw = base({ boxes: new Float32Array([-30, -30, 5000, 5000]) })
-    const [o] = decodeDetections(raw, 1, 300, 200)
+    const [o] = decodeDetections(raw, 1, 300, 200).lines
     expect(o).toMatchObject({ x: 0, y: 0, w: 300, h: 200 })
   })
-  it('行クラス以外(text_block等)は捨て、行クラスはclassIdをlabel-1で持つ', () => {
+  it('行クラスはclassIdをlabel-1で持ち、ブロックはlinesに入らない', () => {
     const raw = base({
       boxes: new Float32Array([0, 0, 100, 40, 0, 100, 100, 140]),
       scores: new Float32Array([0.9, 0.9]),
-      classIds: new BigInt64Array([1n, 17n]), // class 0=text_block(除外), class 16=title(行)
+      classIds: new BigInt64Array([1n, 17n]), // class 0=text_block, class 16=title(行)
     })
     const out = decodeDetections(raw, 1, 1000, 1000)
-    expect(out).toHaveLength(1)
-    expect(out[0].classId).toBe(16)
+    expect(out.lines).toHaveLength(1)
+    expect(out.lines[0].classId).toBe(16)
   })
   it('Int32Arrayのclass idも受け付ける', () => {
     const out = decodeDetections(base({ classIds: new Int32Array([2]) }), 1, 1000, 1000)
-    expect(out).toHaveLength(1)
+    expect(out.lines).toHaveLength(1)
   })
   it('10px未満の箱は捨てる', () => {
     const raw = base({ boxes: new Float32Array([0, 0, 5, 5]) })
-    expect(decodeDetections(raw, 1, 1000, 1000)).toEqual([])
+    expect(decodeDetections(raw, 1, 1000, 1000).lines).toEqual([])
   })
   it('char_count(int64)をnumberのcharCountとして付ける', () => {
     const out = decodeDetections(base({ charCounts: new BigInt64Array([3n]) }), 1, 1000, 1000)
-    expect(out[0].charCount).toBe(3)
-    expect(typeof out[0].charCount).toBe('number')
+    expect(out.lines[0].charCount).toBe(3)
+    expect(typeof out.lines[0].charCount).toBe('number')
   })
   it('char_countが無ければcharCountはundefined', () => {
-    const [o] = decodeDetections(base(), 1, 1000, 1000)
+    const [o] = decodeDetections(base(), 1, 1000, 1000).lines
     expect(o.charCount).toBeUndefined()
+  })
+
+  it('text_block(classId 0)はblocksに入り、パディング拡張されない', () => {
+    const raw = base({
+      boxes: new Float32Array([0, 200, 200, 400]), // label1 -> classId0 = text_block
+      scores: new Float32Array([0.9]),
+      classIds: new BigInt64Array([1n]),
+    })
+    const out = decodeDetections(raw, 0.5, 1000, 1000)
+    expect(out.lines).toEqual([])
+    expect(out.blocks).toEqual([{ x: 0, y: 400, w: 400, h: 400 }])
+  })
+  it('10px未満のブロックは捨てる', () => {
+    const raw = base({
+      boxes: new Float32Array([0, 0, 5, 5]),
+      classIds: new BigInt64Array([1n]),
+    })
+    expect(decodeDetections(raw, 1, 1000, 1000).blocks).toEqual([])
+  })
+  it('ブロックにはNMSをかけない(重なっていても両方残る)', () => {
+    const raw = base({
+      boxes: new Float32Array([0, 0, 100, 100, 5, 5, 105, 105]),
+      scores: new Float32Array([0.9, 0.8]),
+      classIds: new BigInt64Array([1n, 1n]),
+    })
+    expect(decodeDetections(raw, 1, 1000, 1000).blocks).toHaveLength(2)
   })
 })

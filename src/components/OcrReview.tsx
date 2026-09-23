@@ -3,8 +3,10 @@ import type { UseOcrResult } from '../hooks/useOcr'
 import type { OcrResult } from '../lib/ocr/types'
 import type { PageEntry, RawImage } from '../types'
 import { buildPlainText, hasOcrText, ocrFileName } from '../lib/ocrText'
+import { buildParagraphs } from '../lib/paragraphs'
 import { OcrLineList } from './OcrLineList'
 import { OcrOverlay } from './OcrOverlay'
+import { OcrParagraphList } from './OcrParagraphList'
 import { ProgressBar } from './ProgressBar'
 
 export interface OcrReviewProps {
@@ -39,6 +41,7 @@ export function OcrReview({
   title,
 }: OcrReviewProps) {
   const [selectedLineId, setSelectedLineId] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<'lines' | 'paragraphs'>('lines')
   const [addMode, setAddMode] = useState(false)
   const [overwrite, setOverwrite] = useState<null | { kind: 'one' | 'all'; pageId: string | null }>(null)
   const baseline = useRef<unknown>(undefined)
@@ -48,6 +51,11 @@ export function OcrReview({
   const result = page ? ocr.results[page.id] : undefined
   const lines = result?.lines ?? []
   const allIds = pages.map((p) => p.id)
+  // 段落プレビュー中は、画像に重ねる枠も行の枠ではなく段落(所属行の外接矩形)の枠にする。
+  const overlayLines =
+    viewMode === 'paragraphs'
+      ? buildParagraphs(lines).map((p) => ({ id: p.id, ...p.box, text: p.text, edited: false }))
+      : lines
 
   // ページを切り替えたら選択と各モードをリセットする。
   useEffect(() => {
@@ -139,7 +147,7 @@ export function OcrReview({
           type="button"
           className={addMode ? 'btn btn-ghost page-row__merge--active' : 'btn btn-ghost'}
           aria-pressed={addMode}
-          disabled={!result}
+          disabled={!result || viewMode === 'paragraphs'}
           onClick={() => setAddMode((v) => !v)}
         >
           枠を追加
@@ -230,7 +238,8 @@ export function OcrReview({
               image={selectedImage}
               originalWidth={page.width}
               originalHeight={page.height}
-              lines={lines}
+              lines={overlayLines}
+              variant={viewMode === 'paragraphs' ? 'paragraph' : 'line'}
               selectedLineId={selectedLineId}
               onSelectLine={selectLine}
               addMode={addMode}
@@ -246,18 +255,42 @@ export function OcrReview({
 
         <div className="ocr-review__lines panel">
           {result ? (
-            <OcrLineList
-              lines={lines}
-              selectedLineId={selectedLineId}
-              onSelectLine={setSelectedLineId}
-              registerTextareaRef={(id, el) => {
-                if (el) textareas.current.set(id, el)
-                else textareas.current.delete(id)
-              }}
-              onCommit={(lineId, text) => void ocr.updateLine(page!.id, lineId, text)}
-              onDelete={(lineId) => void ocr.deleteLine(page!.id, lineId)}
-              onMove={(lineId, to) => void ocr.moveLine(page!.id, lineId, to)}
-            />
+            <>
+              <div className="ocr-review__view-toggle" role="group" aria-label="表示切り替え">
+                <button
+                  type="button"
+                  className={viewMode === 'lines' ? 'btn btn-primary' : 'btn btn-ghost'}
+                  aria-pressed={viewMode === 'lines'}
+                  onClick={() => setViewMode('lines')}
+                >
+                  行ごと
+                </button>
+                <button
+                  type="button"
+                  className={viewMode === 'paragraphs' ? 'btn btn-primary' : 'btn btn-ghost'}
+                  aria-pressed={viewMode === 'paragraphs'}
+                  onClick={() => setViewMode('paragraphs')}
+                >
+                  段落プレビュー
+                </button>
+              </div>
+              {viewMode === 'lines' ? (
+                <OcrLineList
+                  lines={lines}
+                  selectedLineId={selectedLineId}
+                  onSelectLine={setSelectedLineId}
+                  registerTextareaRef={(id, el) => {
+                    if (el) textareas.current.set(id, el)
+                    else textareas.current.delete(id)
+                  }}
+                  onCommit={(lineId, text) => void ocr.updateLine(page!.id, lineId, text)}
+                  onDelete={(lineId) => void ocr.deleteLine(page!.id, lineId)}
+                  onMove={(lineId, to) => void ocr.moveLine(page!.id, lineId, to)}
+                />
+              ) : (
+                <OcrParagraphList lines={lines} />
+              )}
+            </>
           ) : (
             <p className="ocr-review__empty">このページはまだOCRされていません。</p>
           )}

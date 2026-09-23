@@ -13,14 +13,24 @@ export function resolveModelUrl(siteRelativeUrl: string): string {
   return new URL(import.meta.env.BASE_URL + siteRelativeUrl, self.location.origin).href
 }
 
+// devサーバーでHTMLが返る典型的な原因は npm run fetch-models 未実行(モデルが
+// public/models/ に無い)なので、開発時だけヒントを添える。本番ビルドでは
+// 無関係な文言なので出さない。
+function htmlProblem(): string {
+  const hint = import.meta.env.DEV
+    ? ' (npm run fetch-models でモデルを取得してから再度お試しください)'
+    : ''
+  return `モデルではなくHTMLが返りました${hint}`
+}
+
 // 応答がモデルとして妥当かを調べ、妥当でなければ理由を返す。
 // ONNX は protobuf なので先頭バイトは 0x08 (field 1 = ir_version) だが、
 // ここで見るのは「明らかにモデルでないもの」だけで、正しさは証明しない。
 function findProblem(bytes: ArrayBuffer, contentType: string): string | undefined {
-  if (contentType.includes('text/html')) return 'モデルではなくHTMLが返りました'
+  if (contentType.includes('text/html')) return htmlProblem()
   // '<' 始まりは HTML/XML。Content-Type が正しくても中身で弾く。
   if (bytes.byteLength > 0 && new Uint8Array(bytes, 0, 1)[0] === 0x3c) {
-    return 'モデルではなくHTMLが返りました'
+    return htmlProblem()
   }
   if (bytes.byteLength < MIN_MODEL_BYTES) {
     return `モデルとしては小さすぎます (${bytes.byteLength} バイト)`

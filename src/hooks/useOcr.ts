@@ -173,8 +173,11 @@ export function useOcr(
             }
             await store.putOcr(result)
             if (mountedRef.current) setResults({ ...resultsRef.current, [page.id]: result })
-          } catch {
+          } catch (error) {
             failed.push(page.fileName ?? page.id)
+            // 原因(モデル取得失敗の詳細など)をUIの短いメッセージに含めると
+            // 長くなりすぎるため、コンソールにだけ出す。
+            console.error(`OCRに失敗しました: ${page.fileName ?? page.id}`, error)
             // Workerが壊れている可能性があるので捨てる。次のページで作り直される。
             discardRunner()
           }
@@ -188,7 +191,11 @@ export function useOcr(
         }
       }
       if (mountedRef.current) {
-        setError(failed.length > 0 ? `文字認識に失敗しました: ${failed.join(', ')}` : null)
+        setError(
+          failed.length > 0
+            ? `文字認識に失敗しました: ${failed.join(', ')} (詳細はブラウザの開発者ツールのコンソールを確認してください)`
+            : null,
+        )
         if (reloadPendingRef.current) {
           reloadPendingRef.current = false
           void reload().catch(() => {})

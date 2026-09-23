@@ -75,6 +75,7 @@ beforeEach(setCaches)
 afterEach(() => {
   Object.defineProperty(globalThis, 'caches', { configurable: true, value: original.caches })
   globalThis.fetch = original.fetch
+  vi.unstubAllEnvs()
 })
 
 describe('resolveModelUrl', () => {
@@ -175,6 +176,24 @@ describe('loadModelBytes', () => {
     globalThis.fetch = streamingFetch(html, 2) as unknown as typeof fetch
     await expect(loadModelBytes(URL_A)).rejects.toThrow(/HTML/)
     expect(cache.store.size).toBe(0)
+  })
+
+  // devサーバーでHTMLが返る典型的な原因は npm run fetch-models 未実行なので、
+  // 開発時(import.meta.env.DEV)はそのヒントをエラーメッセージに含める。
+  // 本番ビルドでは無関係な文言なので出さない。
+  it('開発時はHTML拒否のエラーにnpm run fetch-modelsのヒントを含める', async () => {
+    vi.stubEnv('DEV', true)
+    const html = new TextEncoder().encode('<!doctype html><html><body>app</body></html>')
+    globalThis.fetch = streamingFetch(html, 1, 'text/html') as unknown as typeof fetch
+    await expect(loadModelBytes(URL_A)).rejects.toThrow(/npm run fetch-models/)
+  })
+
+  it('本番ビルドではHTML拒否のエラーにfetch-modelsのヒントを含めない', async () => {
+    vi.stubEnv('DEV', false)
+    const html = new TextEncoder().encode('<!doctype html><html><body>app</body></html>')
+    globalThis.fetch = streamingFetch(html, 1, 'text/html') as unknown as typeof fetch
+    await expect(loadModelBytes(URL_A)).rejects.not.toThrow(/npm run fetch-models/)
+    await expect(loadModelBytes(URL_A)).rejects.toThrow(/HTML/)
   })
 
   it('小さすぎる応答はモデルとみなさず拒否する', async () => {
