@@ -1,4 +1,4 @@
-import type { RunOptions, RunSummary } from '../hooks/useOcr'
+import type { OcrProgress, RunOptions, RunSummary } from '../hooks/useOcr'
 import type { OcrResult } from './ocr/types'
 import type { AdjustmentParams, BookMetadata, Chapter, PageEntry } from '../types'
 
@@ -22,7 +22,11 @@ export interface AutomationState {
   canUndoClearAll: boolean
   ocr: {
     running: boolean
-    progress: { done: number; total: number; stage?: string } | null
+    progress: OcrProgress | null
+    /** 同時処理数(同時に動かすOCR Workerの数)。 */
+    concurrency: number
+    /** この端末で選べる同時処理数の上限(論理コア数−1)。 */
+    maxConcurrency: number
   }
   chapters: Chapter[]
 }
@@ -37,6 +41,8 @@ export interface AutomationApi {
   runOcr: (pageId: string, opts?: RunOptions) => Promise<RunSummary>
   runOcrAll: (opts?: RunOptions) => Promise<RunSummary>
   getOcr: (pageId: string) => OcrResult | undefined
+  getOcrConcurrency: () => { value: number; max: number }
+  setOcrConcurrency: (n: number) => number
   setOcrLineText: (pageId: string, lineId: string, text: string) => Promise<void>
   importFiles: (files: File[]) => Promise<void>
   selectPage: (id: string) => Promise<void>
@@ -73,6 +79,8 @@ const API_DESCRIPTION: AutomationApiDescription = {
     runOcr: '(pageId: string, opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 1ページに文字認識をかける。修正済みの行があるページは見送られ、skippedEditedに入る(overwriteEdited: trueで上書き)。',
     runOcrAll: '(opts?: { skipDone?: boolean; overwriteEdited?: boolean }) => Promise<{ skippedEdited: string[] }> — 全ページに文字認識をかける。進捗は getState().ocr で確認できる。',
     getOcr: '(pageId: string) => OcrResult | undefined — ページのOCR結果(行の並びが読み順)を返す。未実行ならundefined。',
+    getOcrConcurrency: '() => { value: number; max: number } — OCRの同時処理数(同時に動かすWorker数)と、この端末での上限(論理コア数−1)を返す。',
+    setOcrConcurrency: '(n: number) => number — OCRの同時処理数を設定する(1〜上限に丸めて保存し、採用した値を返す)。次の実行から反映される。増やすほど速いがメモリを多く使う。',
     setOcrLineText: '(pageId: string, lineId: string, text: string) => Promise<void> — OCR結果の1行の文字を修正する(修正済みとして保存される)。',
     importFiles: '(files: File[]) => Promise<void> — 画像ファイルをページとして読み込む。',
     selectPage: '(id: string) => Promise<void> — 編集対象のページを選択する。',

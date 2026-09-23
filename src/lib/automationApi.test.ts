@@ -12,7 +12,7 @@ function fakeApi(overrides: Partial<Omit<AutomationApi, 'describe'>> = {}): Omit
       error: null,
       importProgress: null,
       canUndoClearAll: false,
-      ocr: { running: false, progress: null },
+      ocr: { running: false, progress: null, concurrency: 2, maxConcurrency: 7 },
       chapters: [],
     })),
     goToStep: vi.fn(),
@@ -23,6 +23,8 @@ function fakeApi(overrides: Partial<Omit<AutomationApi, 'describe'>> = {}): Omit
     runOcr: vi.fn(),
     runOcrAll: vi.fn(),
     getOcr: vi.fn(),
+    getOcrConcurrency: vi.fn(() => ({ value: 2, max: 7 })),
+    setOcrConcurrency: vi.fn((n: number) => n),
     setOcrLineText: vi.fn(),
     importFiles: vi.fn(),
     selectPage: vi.fn(),
@@ -48,6 +50,17 @@ afterEach(() => {
 })
 
 describe('installAutomationApi', () => {
+  it('exposes OCR concurrency getters/setters and documents them', () => {
+    const api = fakeApi({ setOcrConcurrency: vi.fn(() => 3) })
+    installAutomationApi(api)
+    expect(window.EbookMaker?.getOcrConcurrency()).toEqual({ value: 2, max: 7 })
+    expect(window.EbookMaker?.setOcrConcurrency(9)).toBe(3)
+    expect(api.setOcrConcurrency).toHaveBeenCalledWith(9)
+    const methods = window.EbookMaker?.describe().methods
+    expect(methods?.getOcrConcurrency).toMatch(/同時処理数/)
+    expect(methods?.setOcrConcurrency).toMatch(/同時処理数/)
+  })
+
   it('exposes the given operations on window.EbookMaker', () => {
     const api = fakeApi()
 
