@@ -8,8 +8,9 @@ interface MetadataFormProps {
 export function MetadataForm({ metadata, onChange }: MetadataFormProps) {
   return (
     <div className="panel metadata-form__fields">
-      <label>
-        タイトル
+      <h3 className="panel__title">書誌情報</h3>
+      <label className="field">
+        <span className="field__label">タイトル</span>
         <input
           type="text"
           data-testid="title-input"
@@ -17,8 +18,8 @@ export function MetadataForm({ metadata, onChange }: MetadataFormProps) {
           onChange={(event) => onChange({ ...metadata, title: event.target.value })}
         />
       </label>
-      <label>
-        著者
+      <label className="field">
+        <span className="field__label">著者</span>
         <input
           type="text"
           data-testid="author-input"

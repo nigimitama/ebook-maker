@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useRef, useState } from 'react'
 import { ProgressBar } from './ProgressBar'
 
 interface ImportPanelProps {
@@ -87,6 +87,8 @@ export function ImportPanel({
 }: ImportPanelProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  // ドラッグ中だけ枠を強調して、ここに落とせることを伝える。
+  const [dragging, setDragging] = useState(false)
 
   function handleFileList(fileList: File[] | FileList | null) {
     const files = filterImageFiles(fileList)
@@ -96,10 +98,18 @@ export function ImportPanel({
   return (
     <div
       data-testid="import-dropzone"
-      className="dropzone"
-      onDragOver={(event) => event.preventDefault()}
+      className={dragging ? 'dropzone dropzone--dragging' : 'dropzone'}
+      onDragOver={(event) => {
+        event.preventDefault()
+        if (!dragging) setDragging(true)
+      }}
+      onDragLeave={(event) => {
+        // 子要素への出入りでも dragleave が飛ぶので、枠の外へ出たときだけ戻す。
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setDragging(false)
+      }}
       onDrop={(event) => {
         event.preventDefault()
+        setDragging(false)
         const dataTransfer = event.dataTransfer
         if (hasDirectoryEntries(dataTransfer)) {
           filesFromDataTransfer(dataTransfer).then((files) => handleFileList(files))
@@ -108,7 +118,21 @@ export function ImportPanel({
         }
       }}
     >
-      <p>画像をドラッグ&ドロップ、またはファイル/フォルダを選択</p>
+      <svg className="dropzone__icon" viewBox="0 0 48 48" aria-hidden="true">
+        <path d="M14 6h14l10 10v22a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V10a4 4 0 0 1 4-4Z" />
+        <path d="M28 6v10h10" />
+        <path d="M24 34V21m-6 6 6-6 6 6" />
+      </svg>
+      <p className="dropzone__lead">画像をドラッグ&ドロップ、またはファイル/フォルダを選択</p>
+      <p className="dropzone__sub">JPEG・PNG などの画像に対応。フォルダごと追加すると中の画像をまとめて読み込みます。</p>
+      <div className="dropzone__buttons">
+        <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current?.click()}>
+          ファイルを選択
+        </button>
+        <button type="button" className="btn" onClick={() => folderInputRef.current?.click()}>
+          フォルダを選択
+        </button>
+      </div>
       {importProgress && (
         <ProgressBar
           done={importProgress.done}
@@ -123,7 +147,7 @@ export function ImportPanel({
           {onClearAll && (
             <button
               type="button"
-              className="import-count__clear"
+              className="btn-ghost import-count__clear"
               data-testid="clear-all-button"
               onClick={() => onClearAll()}
             >
@@ -136,7 +160,7 @@ export function ImportPanel({
         <p className="import-count" data-testid="undo-clear-all">
           <button
             type="button"
-            className="import-count__undo"
+            className="btn-ghost import-count__undo"
             data-testid="undo-clear-all-button"
             onClick={() => onUndoClearAll()}
           >
@@ -144,12 +168,6 @@ export function ImportPanel({
           </button>
         </p>
       )}
-      <button type="button" onClick={() => fileInputRef.current?.click()}>
-        ファイルを選択
-      </button>
-      <button type="button" onClick={() => folderInputRef.current?.click()}>
-        フォルダを選択
-      </button>
       <input
         ref={fileInputRef}
         type="file"

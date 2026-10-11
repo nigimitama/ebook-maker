@@ -45,7 +45,7 @@ test('import, adjust, merge, add metadata, and export a PDF', async ({ page }) =
   await page.getByText('目次の作成へ進む').click()
   await page.getByText('詳細情報へ進む').click()
 
-  await page.getByRole('button', { name: '書き出し' }).click()
+  await page.getByRole('button', { name: '書き出し', exact: true }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'ダウンロード' }).click(),
@@ -71,7 +71,7 @@ test('exports an EPUB with one xhtml/image pair per page', async ({ page }) => {
   // OCRは任意工程なので飛ばして書き出せる。
   await page.getByText('OCRをスキップして書き出しへ').click()
   await page.getByLabel('EPUB').click()
-  await page.getByRole('button', { name: '書き出し' }).click()
+  await page.getByRole('button', { name: '書き出し', exact: true }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'ダウンロード' }).click(),

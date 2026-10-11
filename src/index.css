@@ -1,39 +1,51 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;700&family=Barlow+Condensed:wght@400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&display=swap');
 
+/* — デザイントークン —
+   page: 画面の地 / bg: 作業面(カード・入力欄) / surface: 一段沈んだ面(レール・ドロップゾーン) */
 :root {
-  --color-bg: #f2f2f3;
-  --color-surface: #e9e9ea;
-  --color-text: #1d1f20;
-  --color-text-muted: color-mix(in srgb, var(--color-text) 55%, transparent);
-  --color-accent: #5980a6;
-  --color-accent-strong: #416180;
-  --color-divider: color-mix(in srgb, #1d1f20 16%, transparent);
+  --color-page: #eceef1;
+  --color-bg: #ffffff;
+  --color-surface: #f5f6f8;
+  --color-text: #1c1f23;
+  --color-text-muted: color-mix(in srgb, var(--color-text) 58%, transparent);
+  --color-accent: #4a74a0;
+  --color-accent-strong: #365a80;
+  --color-accent-soft: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  --color-divider: color-mix(in srgb, #1c1f23 13%, transparent);
   --color-danger: #b3261e;
   --color-danger-bg: #fdecea;
+  --color-success: #2e7d4f;
 
-  --font-heading: 'Barlow Condensed', system-ui, sans-serif;
-  --font-body: 'Barlow', system-ui, 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.04), 0 4px 16px rgb(0 0 0 / 0.05);
+
+  --font-body: 'Noto Sans JP', system-ui, -apple-system, 'Hiragino Sans', 'Yu Gothic UI', Meiryo, sans-serif;
+  --font-heading: var(--font-body);
 
   /* ネイティブのフォーム部品(レンジ、ラジオ、チェックボックス、スクロールバー)を
      配色に追従させる。 */
   color-scheme: light dark;
-  font: 16px/1.55 var(--font-body);
+  font: 15px/1.6 var(--font-body);
   color: var(--color-text);
-  background: var(--color-bg);
+  background: var(--color-page);
   -webkit-font-smoothing: antialiased;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #1b1c1d;
-    --color-surface: #232426;
+    --color-page: #111213;
+    --color-bg: #1b1c1e;
+    --color-surface: #232528;
     --color-text: #ececec;
-    --color-text-muted: color-mix(in srgb, var(--color-text) 55%, transparent);
-    --color-accent: #7ea3c4;
-    --color-accent-strong: #a3c1dc;
-    --color-divider: color-mix(in srgb, #ececeb 18%, transparent);
+    --color-text-muted: color-mix(in srgb, var(--color-text) 58%, transparent);
+    --color-accent: #82a8cc;
+    --color-accent-strong: #a8c5e0;
+    --color-divider: color-mix(in srgb, #ececeb 15%, transparent);
     --color-danger: #ff8a80;
     --color-danger-bg: #3a1d1a;
+    --color-success: #7fd1a0;
+    --shadow-card: 0 1px 2px rgb(0 0 0 / 0.3);
   }
 }
 
@@ -59,43 +71,54 @@ h2,
 h3,
 h4 {
   font-family: var(--font-heading);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 700;
+  font-feature-settings: 'palt';
+  letter-spacing: 0.01em;
   margin: 0 0 8px;
+  line-height: 1.4;
 }
 
 h1 {
-  font-size: 26px;
+  font-size: 20px;
 }
 
 h2 {
-  font-size: 17px;
+  font-size: 16px;
 }
 
 h3 {
-  font-size: 15px;
+  font-size: 14px;
 }
 
 p {
   margin: 0 0 8px;
 }
 
+a {
+  color: var(--color-accent-strong);
+}
+
+/* — ボタン: 既定は枠線のみ。主要導線だけ .btn-primary で塗る。 — */
 button {
-  font: 600 14px var(--font-heading);
-  padding: 7px 16px;
+  font: 500 14px/1.4 var(--font-body);
+  padding: 7px 14px;
   border: 1px solid var(--color-divider);
-  border-radius: 0;
-  background: transparent;
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
   color: var(--color-text);
   cursor: pointer;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s,
+    color 0.12s;
 }
 
 button:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-text) 7%, transparent);
+  background: color-mix(in srgb, var(--color-text) 6%, var(--color-bg));
 }
 
 button:active:not(:disabled) {
-  background: color-mix(in srgb, var(--color-text) 14%, transparent);
+  background: color-mix(in srgb, var(--color-text) 12%, var(--color-bg));
 }
 
 button:disabled {
@@ -105,18 +128,37 @@ button:disabled {
 
 button:focus-visible,
 input:focus-visible,
-img:focus-visible {
+img:focus-visible,
+[role='button']:focus-visible {
   outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
-input[type='text'] {
+input[type='text'],
+input[type='number'] {
   font: 14px var(--font-body);
-  padding: 6px 10px;
-  border: 1px solid var(--color-divider);
-  border-radius: 0;
-  background: var(--color-surface);
+  padding: 7px 10px;
+  border: 1px solid color-mix(in srgb, var(--color-text) 22%, transparent);
+  border-radius: var(--radius-sm);
+  background: var(--color-bg);
   color: var(--color-text);
+  min-width: 0;
+}
+
+input[type='number'] {
+  width: 5.5em;
+  padding: 5px 8px;
+}
+
+input[type='text']:focus,
+input[type='number']:focus {
+  border-color: var(--color-accent);
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
+  outline-offset: 0;
+}
+
+input:disabled {
+  opacity: 0.5;
 }
 
 input[type='range'],
@@ -132,17 +174,20 @@ label {
   font-size: 14px;
 }
 
-/* — 主要導線のボタン(次へ/戻る等)。ワイヤーフレームの中で唯一の
-   塗りつぶしオブジェクトとして accent を塗る。 — */
 .btn-primary {
   background: var(--color-accent);
   border-color: var(--color-accent);
   color: var(--color-bg);
+  font-weight: 700;
 }
 
 .btn-primary:hover:not(:disabled) {
   background: var(--color-accent-strong);
   border-color: var(--color-accent-strong);
+}
+
+.btn-primary:active:not(:disabled) {
+  background: var(--color-accent-strong);
 }
 
 .btn-ghost {
@@ -152,17 +197,59 @@ label {
 }
 
 .btn-ghost:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  background: var(--color-accent-soft);
 }
 
+.btn-ghost:active:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+}
+
+.btn-lg {
+  padding: 11px 28px;
+  font-size: 15px;
+}
+
+/* — 全体の枠 — */
 .app-shell {
-  max-width: 1280px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 32px 16px 48px;
+  padding: 24px 20px 48px;
 }
 
-.app-shell > h1 {
-  margin-bottom: 20px;
+.app-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 16px;
+  margin-bottom: 18px;
+}
+
+.app-header__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.app-header__brand h1 {
+  margin: 0;
+  letter-spacing: 0;
+}
+
+/* 開いた本の小口を模したロゴマーク */
+.app-header__mark {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background:
+    linear-gradient(90deg, transparent 47%, var(--color-bg) 47% 53%, transparent 53%),
+    var(--color-accent);
+  align-self: center;
+}
+
+.app-header__tagline {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-muted);
 }
 
 .error-banner {
@@ -170,9 +257,10 @@ label {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 16px;
-  margin-bottom: 20px;
+  padding: 10px 16px;
+  margin-bottom: 16px;
   border: 1px solid var(--color-danger);
+  border-radius: var(--radius-sm);
   background: var(--color-danger-bg);
   color: var(--color-danger);
 }
@@ -180,40 +268,46 @@ label {
 /* — ウィザード: 左レール + 現在の工程のみを表示する本体 — */
 .wizard {
   display: flex;
-  align-items: flex-start;
+  align-items: stretch;
+  min-height: 560px;
   border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
   background: var(--color-bg);
+  box-shadow: var(--shadow-card);
+  overflow: clip;
 }
 
 .rail {
-  width: 168px;
+  width: 216px;
   flex: none;
   border-right: 1px solid var(--color-divider);
-  padding: 22px 16px;
+  padding: 20px 14px;
   background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
 }
 
 .rail__title {
-  font: 600 11px var(--font-heading);
-  text-transform: uppercase;
+  font: 700 11px var(--font-heading);
   letter-spacing: 0.08em;
   color: var(--color-text-muted);
-  margin-bottom: 14px;
+  margin: 0 8px 12px;
 }
 
 .rail__steps {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 2px;
   position: relative;
 }
 
+/* 工程番号をつなぐ縦線 */
 .rail__steps::before {
   content: '';
   position: absolute;
-  left: 9px;
-  top: 8px;
-  bottom: 8px;
+  left: 19px;
+  top: 18px;
+  bottom: 18px;
   width: 1px;
   background: var(--color-divider);
 }
@@ -224,18 +318,25 @@ label {
   gap: 10px;
   position: relative;
   z-index: 1;
-  font-size: 13px;
+  padding: 7px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--color-text-muted);
+  user-select: none;
 }
 
 .step--active {
   cursor: default;
-  font-family: var(--font-heading);
-  font-weight: 600;
+  font-weight: 700;
+  color: var(--color-text);
+  background: var(--color-bg);
+  box-shadow: 0 0 0 1px var(--color-divider);
 }
 
 .step--done {
   cursor: pointer;
-  color: var(--color-accent-strong);
+  color: var(--color-text);
 }
 
 /* スキップで飛び越えた工程。戻って作業できるので選べるが、「済」の色にはしない。 */
@@ -243,22 +344,28 @@ label {
   cursor: pointer;
 }
 
+.step--done:hover,
+.step--skipped:hover {
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
+}
+
 .step--disabled {
   cursor: default;
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
 .stepnum {
-  width: 19px;
-  height: 19px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
-  font: 600 11px var(--font-heading);
+  font: 700 11px var(--font-heading);
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
   border: 1px solid var(--color-divider);
   background: var(--color-bg);
+  font-variant-numeric: tabular-nums;
 }
 
 .step--active .stepnum {
@@ -267,24 +374,28 @@ label {
   color: var(--color-bg);
 }
 
+/* 済の工程は番号の代わりにチェックを出す(番号は読み上げ用に残す)。 */
 .step--done .stepnum {
-  border-color: var(--color-accent-strong);
-  color: var(--color-accent-strong);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: transparent;
+  position: relative;
 }
 
-.step-content {
-  flex: 1;
-  min-width: 0;
-  padding: 26px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+.step--done .stepnum::after {
+  content: '';
+  position: absolute;
+  width: 9px;
+  height: 5px;
+  border-left: 2px solid var(--color-accent-strong);
+  border-bottom: 2px solid var(--color-accent-strong);
+  transform: translateY(-1px) rotate(-45deg);
 }
 
 .rail__nav {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   margin-top: 20px;
   padding-top: 16px;
   border-top: 1px solid var(--color-divider);
@@ -292,40 +403,129 @@ label {
 
 .rail__nav .btn {
   width: 100%;
+  text-wrap: balance;
 }
 
-.panel {
-  border: 1px solid var(--color-divider);
-  padding: 16px;
+.step-content {
+  flex: 1;
+  min-width: 0;
+  padding: 24px 28px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
-.dropzone {
-  border: 1px solid var(--color-divider);
-  background: var(--color-surface);
-  padding: 40px 16px;
-  text-align: center;
+.step-header {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--color-divider);
 }
 
-.dropzone p {
+.step-header__eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--color-accent-strong);
+}
+
+.step-header__title {
+  margin: 0 0 4px;
+  font-size: 22px;
+}
+
+.step-header__desc {
+  margin: 0;
+  max-width: 64em;
+  font-size: 13.5px;
   color: var(--color-text-muted);
 }
 
-.dropzone button {
-  margin: 0 4px;
+/* — パネル: 本体の中の区画。罫線は1本、背景は作業面と同じ。 — */
+.panel {
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
+  padding: 16px 18px;
+  background: var(--color-bg);
+}
+
+.panel > h2,
+.panel__title {
+  font-size: 14px;
+  margin: 0 0 12px;
+}
+
+.dropzone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  border: 2px dashed color-mix(in srgb, var(--color-text) 20%, transparent);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  padding: 48px 20px;
+  text-align: center;
+  transition:
+    border-color 0.15s,
+    background-color 0.15s;
+}
+
+.dropzone--dragging {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.dropzone__icon {
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  fill: none;
+  stroke: var(--color-accent);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dropzone__lead {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.dropzone__sub {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.dropzone__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dropzone .progress-bar {
+  width: min(100%, 420px);
 }
 
 .import-count {
-  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 18px 0 0;
+  padding: 4px 6px 4px 14px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-divider);
+  font-weight: 700;
   color: var(--color-text);
 }
 
-.import-count__clear {
-  margin-left: 8px;
-  font-weight: normal;
-}
-
+.import-count__clear,
 .import-count__undo {
-  font-weight: normal;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
 }
 
 /* — 並べ替え・調整工程: 左に PageList、右にプレビュー(AdjustmentEditor) を並べる — */
@@ -341,21 +541,25 @@ label {
 }
 
 .page-adjust-layout__preview {
-  width: 320px;
+  width: 340px;
   flex: none;
   min-width: 0;
+  position: sticky;
+  top: 16px;
 }
 
 .page-list__sort {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-bottom: 12px;
 }
 
 .page-list__sort-label {
   color: var(--color-text-muted);
-  font-size: 0.9em;
+  font-size: 13px;
+  margin-right: auto;
 }
 
 /* — 並べ替え工程: 1ファイル1行の縦積みリスト。カード+影ではなく、
@@ -375,15 +579,20 @@ label {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 10px 6px;
+  padding: 8px 8px;
   border-bottom: 1px solid var(--color-divider);
   border-left: 3px solid transparent;
   cursor: pointer;
 }
 
-.page-row--selected {
+.page-row:hover {
+  background: color-mix(in srgb, var(--color-text) 3%, transparent);
+}
+
+.page-row--selected,
+.page-row--selected:hover {
   border-left-color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+  background: var(--color-accent-soft);
 }
 
 .page-row--pending-delete {
@@ -395,17 +604,20 @@ label {
   flex: none;
   padding: 0;
   border: 1px solid var(--color-divider);
+  border-radius: 3px;
   background: var(--color-surface);
   cursor: zoom-in;
+  overflow: hidden;
 }
 
-.page-row__thumb-btn:hover {
+.page-row__thumb-btn:hover:not(:disabled) {
   border-color: var(--color-accent);
+  background: var(--color-surface);
 }
 
 .page-list__thumb {
-  width: 64px;
-  height: 84px;
+  width: 56px;
+  height: 74px;
   object-fit: cover;
   background: var(--color-bg);
 }
@@ -415,7 +627,7 @@ label {
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 4px;
 }
 
 .page-row__name {
@@ -423,21 +635,24 @@ label {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 14px;
+  font-weight: 500;
 }
 
 .page-row__badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 4px;
 }
 
 .page-row__tone-badge,
 .page-row__resize-badge,
 .page-row__quality-badge {
-  padding: 1px 6px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--color-surface);
   border: 1px solid var(--color-divider);
-  border-radius: 3px;
   font-size: 11px;
+  line-height: 18px;
   color: var(--color-text-muted);
   white-space: nowrap;
 }
@@ -445,10 +660,16 @@ label {
 .page-row__actions {
   flex: none;
   display: flex;
-  gap: 8px;
+  gap: 4px;
 }
 
-.page-row__merge--active {
+.page-row__actions button {
+  padding: 5px 10px;
+  font-size: 13px;
+}
+
+.page-row__merge--active,
+.page-row__merge--active:hover:not(:disabled) {
   color: var(--color-bg);
   background: var(--color-accent);
 }
@@ -472,12 +693,14 @@ label {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  min-width: 60vw;
+  min-width: min(60vw, 100%);
   max-width: min(90vw, 720px);
   max-height: 90vh;
   padding: 16px;
   border: 1px solid var(--color-divider);
+  border-radius: var(--radius);
   background: var(--color-bg);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.3);
 }
 
 .thumb-modal__frame--with-side-panel {
@@ -555,9 +778,11 @@ label {
   flex-wrap: wrap;
   align-items: center;
   gap: 8px;
-  margin-top: 12px;
+  margin: 0 0 12px;
   padding: 12px;
   border: 1px solid var(--color-accent);
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
 }
 
 .merge-preview img {
@@ -571,33 +796,102 @@ label {
   width: auto;
   height: auto;
   max-width: 100%;
-  max-height: 60vh;
-  margin: 0 auto;
+  max-height: 56vh;
+  margin: 0 auto 4px;
   border: 1px solid var(--color-divider);
   background: var(--color-surface);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.06);
+}
+
+.adjustment-editor__undo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 4px 4px 4px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-accent-soft);
+  font-size: 13px;
 }
 
 .adjustment-editor__controls {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 16px;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 8px;
 }
 
-.adjustment-editor__auto {
-  display: flex;
-  gap: 8px;
-}
-
+/* 各調整グループ。fieldset の既定の枠をやめ、見出し+罫線区切りにする。 */
 .adjustment-editor__tone,
 .adjustment-editor__quality,
 .adjustment-editor__resize {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
-  border: 1px solid var(--color-divider);
-  padding: 8px 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-divider);
+  padding: 14px 0 4px;
+  min-width: 0;
+}
+
+.adjustment-editor__controls > fieldset:first-child {
+  border-top: 0;
+}
+
+.adjustment-editor__controls legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+/* ラベル | スライダー | 値 を揃える */
+.adjustment-editor__tone label,
+.adjustment-editor__quality label {
+  display: grid;
+  grid-template-columns: auto 1fr 3ch;
+  gap: 10px;
+}
+
+.adjustment-editor__quality label {
+  grid-template-columns: 1fr 3ch;
+}
+
+.adjustment-editor__tone label > span,
+.adjustment-editor__quality label > span {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  color: var(--color-text-muted);
+}
+
+.adjustment-editor__tone input[type='range'],
+.adjustment-editor__quality input[type='range'] {
+  width: 100%;
+  min-width: 0;
+}
+
+.adjustment-editor__tone label {
+  grid-template-columns: 6em 1fr 4ch;
+}
+
+.adjustment-editor__auto {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.adjustment-editor__controls fieldset > button,
+.adjustment-editor__auto button {
+  font-size: 13px;
+  padding: 6px 10px;
 }
 
 .adjustment-editor__resize input[type='number'] {
@@ -607,22 +901,100 @@ label {
 .metadata-form__fields {
   display: flex;
   flex-wrap: wrap;
-  gap: 16px;
+  align-items: flex-end;
+  gap: 12px 20px;
+}
+
+.metadata-form__fields .panel__title {
+  flex-basis: 100%;
+  margin-bottom: 0;
+}
+
+.field {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  flex: 1 1 240px;
+  max-width: 420px;
+}
+
+.field__label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text-muted);
 }
 
 .export-panel__formats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  max-width: 640px;
+  margin-bottom: 16px;
+}
+
+/* ラジオを選択肢カードとして見せる */
+.choice {
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    background-color 0.12s;
+}
+
+.choice:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 60%, transparent);
+}
+
+.choice--checked {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.choice input {
+  margin-top: 4px;
+}
+
+.choice__body {
   display: flex;
-  gap: 16px;
-  margin-bottom: 12px;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.choice__title {
+  font-weight: 700;
+}
+
+.choice__desc {
+  font-size: 12px;
+  color: var(--color-text-muted);
 }
 
 .export-panel__option {
-  display: block;
-  margin-bottom: 12px;
+  display: flex;
+  margin-bottom: 16px;
 }
 
 .export-panel__actions {
   margin-top: 4px;
+}
+
+.export-panel__done {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 12px 16px;
+  border: 1px solid color-mix(in srgb, var(--color-success) 50%, transparent);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--color-success) 9%, transparent);
+  color: var(--color-success);
+  font-weight: 700;
 }
 
 .export-panel__error {
@@ -661,14 +1033,15 @@ label {
 /* — OCR確認・修正画面 — */
 .ocr-settings {
   margin-bottom: 12px;
-  padding: 8px 12px;
+  padding: 12px 16px;
   border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
 }
 
 .ocr-settings__title {
   margin: 0 0 6px;
-  font-size: 1rem;
+  font-size: 13px;
 }
 
 .ocr-settings__row {
@@ -701,6 +1074,7 @@ label {
   margin-bottom: 12px;
   padding: 8px 12px;
   border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
 }
 
@@ -729,9 +1103,18 @@ label {
 
 .ocr-status {
   margin-left: auto;
-  padding: 0 6px;
+  flex: none;
+  padding: 0 8px;
   border: 1px solid var(--color-divider);
-  font-size: 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--color-text-muted);
+}
+
+.ocr-status--done {
+  border-color: color-mix(in srgb, var(--color-success) 50%, transparent);
+  color: var(--color-success);
 }
 
 .ocr-status--edited {
@@ -792,6 +1175,7 @@ label {
   padding: 8px;
   margin-bottom: 8px;
   border: 1px solid var(--color-divider);
+  border-radius: var(--radius-sm);
 }
 
 .ocr-line--selected {
@@ -849,8 +1233,33 @@ label {
 
 .chapters-step { display: flex; flex-direction: column; gap: 1rem; }
 .chapters-step__pages { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.75rem 0; }
-.chapters-step__page { display: flex; flex-direction: column; align-items: center; gap: 0.25rem; font-size: 0.8rem; }
-.chapters-step__page img { width: 48px; height: auto; }
+.chapters-step__page {
+  display: grid;
+  grid-template-rows: 72px auto auto;
+  justify-items: center;
+  align-items: end;
+  gap: 4px;
+  width: 64px;
+  font-size: 11px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.chapters-step__page:has(input:checked) { color: var(--color-accent-strong); font-weight: 700; }
+.chapters-step__page:has(input:checked) .chapters-step__thumb-btn {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent);
+}
+.chapters-step__page img { width: 52px; height: auto; max-height: 70px; object-fit: contain; }
+.chapters-step__parse {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-divider);
+}
+.chapters-step__notice { margin: 10px 0 0; font-size: 13px; color: var(--color-text-muted); }
 .chapters-step__row { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
 .chapters-step__row img { width: 32px; height: auto; }
 .chapters-step__row input[type='text'] { flex: 1; min-width: 0; }
@@ -859,8 +1268,10 @@ label {
   flex: none;
   padding: 0;
   border: 1px solid var(--color-divider);
+  border-radius: 3px;
   background: var(--color-surface);
   cursor: zoom-in;
+  overflow: hidden;
 }
 
 .chapters-step__thumb-btn:hover {
@@ -893,7 +1304,7 @@ label {
   gap: 0.75rem;
   padding: 0.4rem 0.6rem;
   border: 1px solid var(--color-divider);
-  border-radius: 4px;
+  border-radius: var(--radius-sm);
 }
 
 .title-step__candidate-text {
@@ -916,4 +1327,101 @@ label {
   gap: 0.25rem;
   flex: none;
   white-space: nowrap;
+}
+
+/* — 狭い画面: レールを上部の横並びにし、2〜3列のレイアウトを縦積みにする — */
+@media (max-width: 900px) {
+  .app-shell {
+    padding: 16px 12px 32px;
+  }
+
+  .wizard {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .rail {
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--color-divider);
+    padding: 12px;
+  }
+
+  .rail__title {
+    display: none;
+  }
+
+  .rail__steps {
+    flex-direction: row;
+    overflow-x: auto;
+    gap: 4px;
+    scrollbar-width: none;
+  }
+
+  .rail__steps::before {
+    display: none;
+  }
+
+  .step {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .rail__nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+
+  .rail__nav .btn {
+    width: auto;
+    flex: 1 1 auto;
+  }
+
+  .step-content {
+    padding: 16px;
+  }
+
+  .page-adjust-layout {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .page-adjust-layout__list,
+  .page-adjust-layout__preview,
+  .ocr-review__layout > .ocr-review__pages,
+  .ocr-review__layout > .ocr-review__lines {
+    width: auto;
+    min-width: 0;
+    position: static;
+  }
+
+  .ocr-review__layout > .ocr-review__pages {
+    max-height: 40vh;
+  }
+
+  .page-row {
+    flex-wrap: wrap;
+  }
+
+  .page-row__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .thumb-modal__body {
+    flex-direction: column;
+  }
+
+  .thumb-modal__side-panel {
+    width: auto;
+    border-left: 0;
+    padding-left: 0;
+  }
+}
+
+.ocr-review__pages .page-list__thumb {
+  border: 1px solid var(--color-divider);
+  border-radius: 3px;
 }

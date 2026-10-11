@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { act, render, screen, fireEvent } from '@testing-library/react'
+import { act, render, screen, fireEvent, within } from '@testing-library/react'
 import { App } from './App'
 import * as useBookModule from './hooks/useBook'
 import * as useChaptersModule from './hooks/useChapters'
@@ -76,7 +76,7 @@ describe('App', () => {
       '目次の作成',
       '詳細＆書き出し',
     ]) {
-      expect(screen.getByText(label)).toBeInTheDocument()
+      expect(within(screen.getByRole('navigation')).getByText(label)).toBeInTheDocument()
     }
   })
 
