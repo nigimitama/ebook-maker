@@ -76,33 +76,42 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
 
   return (
     <div className="panel">
-      <div className="export-panel__formats">
-      <label>
-        <input
-          type="radio"
-          name="format"
-          value="pdf"
-          checked={format === 'pdf'}
-          onChange={() => {
-            setFormat('pdf')
-            resetResult()
-          }}
-        />
-        PDF
-      </label>
-      <label>
-        <input
-          type="radio"
-          name="format"
-          value="epub"
-          checked={format === 'epub'}
-          onChange={() => {
-            setFormat('epub')
-            resetResult()
-          }}
-        />
-        EPUB
-      </label>
+      <h3 className="panel__title">形式</h3>
+      <div className="export-panel__formats" role="radiogroup" aria-label="書き出し形式">
+        <label className={format === 'pdf' ? 'choice choice--checked' : 'choice'}>
+          <input
+            type="radio"
+            name="format"
+            value="pdf"
+            aria-label="PDF"
+            checked={format === 'pdf'}
+            onChange={() => {
+              setFormat('pdf')
+              resetResult()
+            }}
+          />
+          <span className="choice__body">
+            <span className="choice__title">PDF</span>
+            <span className="choice__desc">どの端末でも見た目そのまま。印刷やPCでの閲覧向け</span>
+          </span>
+        </label>
+        <label className={format === 'epub' ? 'choice choice--checked' : 'choice'}>
+          <input
+            type="radio"
+            name="format"
+            value="epub"
+            aria-label="EPUB"
+            checked={format === 'epub'}
+            onChange={() => {
+              setFormat('epub')
+              resetResult()
+            }}
+          />
+          <span className="choice__body">
+            <span className="choice__title">EPUB</span>
+            <span className="choice__desc">固定レイアウトの電子書籍。電子書籍リーダー向け</span>
+          </span>
+        </label>
       </div>
       {chapterCount > 0 && (
         <label className="export-panel__option">
@@ -119,7 +128,12 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
       )}
       {/* 設定の横に並ぶと設定の一部に見えるので、書き出しボタンは設定の下に置く。 */}
       <div className="export-panel__actions">
-        <button type="button" onClick={handleExport} disabled={status === 'running'}>
+        <button
+          type="button"
+          className="btn btn-primary btn-lg"
+          onClick={handleExport}
+          disabled={status === 'running'}
+        >
           書き出し
         </button>
       </div>
@@ -140,7 +154,8 @@ export function ExportPanel({ onExport, title, chapterCount = 0 }: ExportPanelPr
         </p>
       )}
       {status === 'done' && download && (
-        <div className="export-panel__actions">
+        <div className="export-panel__done" role="status">
+          <span>書き出しが完了しました。</span>
           <button type="button" className="btn btn-primary" onClick={saveDownload}>
             ダウンロード
           </button>

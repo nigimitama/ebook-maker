@@ -74,7 +74,7 @@ test('export keeps the original resolution despite downscaled previews', async (
   await expect(page.getByRole('listitem')).toHaveCount(1)
   await page.getByText('OCRをスキップして書き出しへ').click()
 
-  await page.getByRole('button', { name: '書き出し' }).click()
+  await page.getByRole('button', { name: '書き出し', exact: true }).click()
   const [download] = await Promise.all([
     page.waitForEvent('download'),
     page.getByRole('button', { name: 'ダウンロード' }).click(),

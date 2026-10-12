@@ -220,33 +220,35 @@ export function ChaptersStep({
             )
           })}
         </div>
-        <label>
-          本文1ページ目 = 画像
-          <input
-            type="number"
-            min={1}
-            max={Math.max(pages.length, 1)}
-            aria-label="本文1ページ目は画像何枚目か"
-            value={bodyStart}
-            onChange={(event) => {
-              onTocSelectionChange({
-                ...tocSelection,
-                bodyStart: Number(event.target.value) || 1,
-                bodyStartEdited: true,
-              })
-            }}
-          />
-          枚目
-        </label>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={tocPageIds.length === 0}
-          onClick={handleParse}
-        >
-          {chapters.length > 0 ? '目次を解析して置き換える' : '目次を解析'}
-        </button>
-        {notice && <p role="status">{notice}</p>}
+        <div className="chapters-step__parse">
+          <label>
+            本文1ページ目 = 画像
+            <input
+              type="number"
+              min={1}
+              max={Math.max(pages.length, 1)}
+              aria-label="本文1ページ目は画像何枚目か"
+              value={bodyStart}
+              onChange={(event) => {
+                onTocSelectionChange({
+                  ...tocSelection,
+                  bodyStart: Number(event.target.value) || 1,
+                  bodyStartEdited: true,
+                })
+              }}
+            />
+            枚目
+          </label>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={tocPageIds.length === 0}
+            onClick={handleParse}
+          >
+            {chapters.length > 0 ? '目次を解析して置き換える' : '目次を解析'}
+          </button>
+        </div>
+        {notice && <p role="status" className="chapters-step__notice">{notice}</p>}
       </div>
 
       <div className="panel">

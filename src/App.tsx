@@ -19,6 +19,16 @@ import { installAutomationApi, toAutomationPageSummary } from './lib/automationA
 const STEPS = ['読み込み', '並べ替え・調整', 'OCR確認・修正', 'タイトルの設定', '目次の作成', '詳細＆書き出し'] as const
 const EXPORT_STEP = STEPS.length - 1
 
+// 本文の見出しの下に出す、その工程で何をするかの一言。
+const STEP_DESCRIPTIONS: Record<number, string> = {
+  0: 'スキャンした画像を追加します。画像はこの端末のブラウザ内だけで処理され、外部には送信されません。',
+  1: 'ページの順番を整え、明るさ・コントラストや画質を調整します。見開きページはここで1枚に結合できます。',
+  2: '文字認識(OCR)を実行し、読み取り結果を確認・修正します。結果はタイトル・目次の入力やテキスト保存に使えます。',
+  3: '本のタイトルと著者を入力します。表紙をOCRすると、読み取った文字から選んで入力できます。',
+  4: '目次ページのOCR結果から章立てを作ります。書き出し時にPDFのしおり・EPUBの目次になります。',
+  5: '形式を選んで、PDFまたはEPUBとして書き出します。',
+}
+
 export function App() {
   const book = useBook()
   const selectedPage = book.pages.find((p) => p.id === book.selectedPageId)
@@ -126,7 +136,13 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <h1>ebook-maker</h1>
+      <header className="app-header">
+        <div className="app-header__brand">
+          <span className="app-header__mark" aria-hidden="true" />
+          <h1>ebook-maker</h1>
+        </div>
+        <p className="app-header__tagline">スキャン画像からPDF・EPUBを作る — 画像はブラウザの外に出ません</p>
+      </header>
       {error && (
         <div role="alert" data-testid="error-banner" className="error-banner">
           <span>{error}</span>
@@ -161,10 +177,20 @@ export function App() {
                           ? 'step step--done'
                           : 'step step--skipped'
                   }
+                  role="button"
+                  tabIndex={isReachable && !isActive ? 0 : -1}
+                  aria-current={isActive ? 'step' : undefined}
+                  aria-disabled={!isReachable || undefined}
                   onClick={() => isReachable && goTo(index)}
+                  onKeyDown={(event) => {
+                    if ((event.key === 'Enter' || event.key === ' ') && isReachable) {
+                      event.preventDefault()
+                      goTo(index)
+                    }
+                  }}
                 >
                   <span className="stepnum">{index + 1}</span>
-                  <span>{label}</span>
+                  <span className="step__label">{label}</span>
                 </div>
               )
             })}
@@ -238,6 +264,13 @@ export function App() {
         </nav>
 
         <div className="step-content">
+          <header className="step-header">
+            <p className="step-header__eyebrow">
+              STEP {step + 1} / {STEPS.length}
+            </p>
+            <h2 className="step-header__title">{STEPS[step]}</h2>
+            <p className="step-header__desc">{STEP_DESCRIPTIONS[step]}</p>
+          </header>
           {step === 0 && (
             <>
               <ImportPanel
